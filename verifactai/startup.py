@@ -31,8 +31,8 @@ def main() -> None:
         print("  This takes ~2-3 minutes on first deploy.")
         print("=" * 50)
 
-        # Build a small index (1000 articles) for fast startup
-        max_articles = int(os.environ.get("VERIFACT_INDEX_SIZE", "1000"))
+        # Build index — 5000 articles gives good coverage for common facts
+        max_articles = int(os.environ.get("VERIFACT_INDEX_SIZE", "5000"))
 
         from data.build_index import build_and_save, load_wikipedia
 

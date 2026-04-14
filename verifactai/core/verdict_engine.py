@@ -127,9 +127,18 @@ class VerdictEngine:
         )
         best_support = nli_results[best_support_idx]
 
-        # Step 3 — verdict label (tightened)
+        # Step 3 — verdict label (tightened + soft contradiction path)
         nc = self.config.nli
-        if max_con > nc.contradiction_threshold and max_con > max_raw_ent:
+
+        # CONTRADICTED if:
+        #   Hard path: NLI contradiction > threshold AND > raw entailment
+        #   Soft path: moderate contradiction (>0.50) AND > specificity-gated entailment
+        #   The soft path catches cases with small corpus / indirect evidence
+        is_contradicted = (max_con > nc.contradiction_threshold and max_con > max_raw_ent) or (
+            max_con > 0.50 and max_con > max_specific_ent
+        )
+
+        if is_contradicted:
             label = "CONTRADICTED"
             best_ev = best_contra.evidence
         elif max_specific_ent > nc.entailment_threshold:
