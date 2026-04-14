@@ -19,12 +19,12 @@ import numpy as np
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from core.evidence_retriever import Evidence
 from utils.helpers import logger, timed
 
 if TYPE_CHECKING:
     from config import Config
     from core.claim_decomposer import Claim
-    from core.evidence_retriever import Evidence
 
 
 @dataclass
@@ -81,6 +81,41 @@ class VerdictEngine:
     @timed
     def judge(self, claim: Claim, evidence_list: list[Evidence]) -> Verdict:
         """Produce a verdict for one claim against its retrieved evidence."""
+
+        # ── Rule-based pre-check: catch obvious impossibilities ──
+        from core.fact_rules import check_rules
+
+        rule_violation = check_rules(claim.text)
+        if rule_violation is not None:
+            logger.info(
+                f"Rule override [{rule_violation.rule_name}]: {claim.text[:60]} → CONTRADICTED"
+            )
+            # Create a synthetic evidence from the rule
+            rule_evidence = Evidence(
+                text=rule_violation.correct_fact,
+                source="factual_rule",
+                title=f"Rule: {rule_violation.rule_name}",
+                url="",
+                similarity=1.0,
+                chunk_id=-1,
+            )
+            return Verdict(
+                label="CONTRADICTED",
+                confidence=0.95,
+                uncertainty=0.05,
+                stability=0.95,
+                best_evidence=rule_evidence,
+                nli_scores={
+                    "entailment": 0.0,
+                    "contradiction": 1.0,
+                    "neutral": 0.0,
+                    "rule_override": True,
+                    "rule_name": rule_violation.rule_name,
+                    "rule_reason": rule_violation.reason,
+                },
+                all_nli=[],
+            )
+
         if not evidence_list:
             return Verdict(
                 label="NO_EVIDENCE",
