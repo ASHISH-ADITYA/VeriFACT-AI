@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from config import Config
+from core.hallucination_discriminator import HallucinationDiscriminator
 from core.pipeline import VeriFactPipeline
 from core.risk_classifier import RiskClassifier
 from utils.runtime_safety import apply_runtime_safety_defaults
@@ -27,15 +28,43 @@ apply_runtime_safety_defaults()
 _PIPELINE: VeriFactPipeline | None = None
 _PIPELINE_LOCK = threading.Lock()
 _RISK_CLASSIFIER: RiskClassifier | None = None
+_DISCRIMINATOR: HallucinationDiscriminator | None = None
 _API_TOKEN = os.environ.get("VERIFACT_API_TOKEN", "").strip()
 _ENABLE_RISK_CLASSIFIER = os.environ.get("VERIFACT_ENABLE_RISK_CLASSIFIER", "1") == "1"
+_ENABLE_DISCRIMINATOR = os.environ.get("VERIFACT_ENABLE_DISCRIMINATOR", "0") == "1"
+_DISCRIMINATOR_PATH = os.environ.get(
+    "VERIFACT_DISCRIMINATOR_PATH", "assets/models/hallucination_discriminator.joblib"
+)
 
+# CORS origins — configurable via env for production (comma-separated)
+_EXTRA_ORIGINS = os.environ.get("VERIFACT_CORS_ORIGINS", "").strip()
 _ALLOWED_ORIGIN_PREFIXES = (
     "https://chatgpt.com",
     "https://chat.openai.com",
     "https://claude.ai",
     "https://gemini.google.com",
-)
+) + tuple(o.strip() for o in _EXTRA_ORIGINS.split(",") if o.strip())
+
+# Rate limiter — simple in-memory per-IP (resets on restart)
+_RATE_LIMIT = int(os.environ.get("VERIFACT_RATE_LIMIT", "20"))  # requests per minute
+_rate_buckets: dict[str, list[float]] = {}
+_rate_lock = threading.Lock()
+
+
+def _check_rate_limit(ip: str) -> bool:
+    """Returns True if allowed, False if rate-limited."""
+    import time
+
+    now = time.time()
+    window = 60.0
+    with _rate_lock:
+        bucket = _rate_buckets.setdefault(ip, [])
+        # Prune old entries
+        _rate_buckets[ip] = [t for t in bucket if now - t < window]
+        if len(_rate_buckets[ip]) >= _RATE_LIMIT:
+            return False
+        _rate_buckets[ip].append(now)
+        return True
 
 
 def get_pipeline() -> VeriFactPipeline:
@@ -53,6 +82,18 @@ def get_risk_classifier() -> RiskClassifier | None:
     if _RISK_CLASSIFIER is None:
         _RISK_CLASSIFIER = RiskClassifier()
     return _RISK_CLASSIFIER
+
+
+def get_discriminator() -> HallucinationDiscriminator | None:
+    global _DISCRIMINATOR
+    if not _ENABLE_DISCRIMINATOR:
+        return None
+    if _DISCRIMINATOR is None:
+        model = HallucinationDiscriminator(_DISCRIMINATOR_PATH)
+        if not model.load():
+            return None
+        _DISCRIMINATOR = model
+    return _DISCRIMINATOR
 
 
 def summarize(result: Any) -> str:
@@ -97,6 +138,7 @@ def _severity_for_claim(verdict: str, confidence: float) -> str:
 
 def _build_alerts(flags: list[dict[str, Any]]) -> list[dict[str, Any]]:
     classifier = get_risk_classifier()
+    discriminator = get_discriminator()
     alerts: list[dict[str, Any]] = []
     for flag in flags:
         verdict = str(flag.get("verdict") or "")
@@ -122,6 +164,14 @@ def _build_alerts(flags: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     x in pred.label for x in ("toxic", "insult", "hate", "offens")
                 )
 
+        discriminator_score = 0.0
+        if discriminator is not None:
+            pred = discriminator.predict(claim)
+            discriminator_score = float(pred.score)
+            if pred.label == "hallucinated" and verdict.upper() in {"UNVERIFIABLE", "NO_EVIDENCE"}:
+                category = "hallucination"
+                message = "Discriminator flagged high hallucination likelihood for this claim."
+
         if _contains_bias_cue(claim) or classifier_hit:
             category = "bias"
             message = (
@@ -141,6 +191,7 @@ def _build_alerts(flags: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "claim": claim,
                 "confidence": conf,
                 "classifier_score": round(classifier_score, 4),
+                "discriminator_score": round(discriminator_score, 4),
             }
         )
 
@@ -246,6 +297,11 @@ class OverlayHandler(BaseHTTPRequestHandler):
 
         if not self._is_authorized():
             self._json_response(401, {"error": "unauthorized"})
+            return
+
+        client_ip = self.client_address[0]
+        if not _check_rate_limit(client_ip):
+            self._json_response(429, {"error": "rate_limited", "retry_after_seconds": 60})
             return
 
         try:

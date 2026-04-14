@@ -41,6 +41,7 @@ apply_runtime_safety_defaults()
 
 from config import Config, Profile  # noqa: E402
 from core.pipeline import VeriFactPipeline  # noqa: E402
+from evaluation.domain_benchmark import evaluate_domain_dataset  # noqa: E402
 from evaluation.metrics import (  # noqa: E402
     binary_hallucination_metrics,
     latency_percentiles,
@@ -346,10 +347,23 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="VeriFactAI Evaluation Suite")
     parser.add_argument(
         "--benchmark",
-        choices=["truthfulqa-fixed", "truthfulqa-live", "halueval", "sanity", "core", "all"],
+        choices=[
+            "truthfulqa-fixed",
+            "truthfulqa-live",
+            "halueval",
+            "domain",
+            "sanity",
+            "core",
+            "all",
+        ],
         default="all",
     )
     parser.add_argument("--max-samples", type=int, default=None)
+    parser.add_argument(
+        "--domain-dataset",
+        default=str(PROJECT_ROOT / "evaluation" / "data" / "legal_domain.jsonl"),
+        help="JSONL dataset for domain benchmark",
+    )
     parser.add_argument(
         "--profile",
         choices=["interactive", "eval"],
@@ -373,6 +387,12 @@ def main() -> None:
 
     if args.benchmark in ("halueval", "core", "all"):
         all_metrics["halueval"] = evaluate_halueval(pipeline, args.max_samples)
+
+    if args.benchmark in ("domain", "core", "all"):
+        all_metrics["domain"] = evaluate_domain_dataset(
+            pipeline,
+            dataset_path=args.domain_dataset,
+        )
 
     if args.benchmark in ("truthfulqa-live", "all"):
         all_metrics["truthfulqa_live"] = evaluate_truthfulqa_live(pipeline, args.max_samples)

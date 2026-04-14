@@ -13,10 +13,10 @@ Legend:
 |---|---|---|---|
 | architecture/1.md | Hallucination taxonomy and benchmark-driven evaluation | Partial | Evaluation harness + report docs, but no full taxonomy classifier stack |
 | architecture/2.md | Uncertainty-aware reliability framing | Partial | Uncertainty-aware confidence added in NLI engine |
-| architecture/3.md | Domain-specific hallucination profiling (legal style) | Planned | No legal-domain benchmark pipeline yet |
+| architecture/3.md | Domain-specific hallucination profiling (legal style) | Partial | Domain JSONL benchmark entrypoint added with legal starter dataset |
 | architecture/4.md | RAG limits and groundedness distinction | Implemented | Retrieval + NLI + evidence-grounded verdict pipeline |
 | architecture/5.md | Hybrid detection strategy across modules | Implemented | Claim decomposition + retrieval + NLI + confidence fusion |
-| architecture/6.md | Learned discriminator for hallucination detection | Planned | No dedicated RelD-style discriminator training module yet |
+| architecture/6.md | Learned discriminator for hallucination detection | Partial | Local TF-IDF + LogisticRegression discriminator module with save/load + overlay hook |
 | architecture/7.md | Real-world interaction benchmark behavior | Planned | AuthenHallu-style dataset integration not present |
 | architecture/8.md | TruthfulQA as truthfulness benchmark | Implemented | `evaluation/evaluate.py` TruthfulQA modes |
 | architecture/9.md | RAG system design patterns | Implemented | FAISS retrieval pipeline in core |
@@ -46,6 +46,9 @@ Legend:
 6. Optional classifier-assisted risk signaling
 - Existing optional local risk classifier remains integrated with fail-soft behavior.
 
+7. Discriminator + domain benchmark path
+- Added free local discriminator training/inference module and domain benchmark runner.
+
 ## Evidence Files
 
 - `core/verdict_engine.py`
@@ -56,10 +59,13 @@ Legend:
 - `core/annotator.py`
 - `overlay_server.py`
 - `core/risk_classifier.py`
+- `core/hallucination_discriminator.py`
 - `integrations/web_beacon_extension/content.js`
+- `evaluation/domain_benchmark.py`
+- `evaluation/data/legal_domain.jsonl`
 
 ## Gap Closure Plan (to target 8-9/10 MVP)
 
 1. Upgrade semantic entropy from label-level sampling to meaning-cluster entropy over generated explanations.
-2. Add learned hallucination discriminator training path.
-3. Add domain-specific evaluation pack (legal + real-world chat corpus).
+2. Expand discriminator from baseline TF-IDF to stronger encoder-based model with benchmark reporting.
+3. Add larger real-world chat and legal domain datasets for robust significance testing.
