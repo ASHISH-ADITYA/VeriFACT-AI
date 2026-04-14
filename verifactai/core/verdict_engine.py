@@ -39,6 +39,8 @@ class Verdict:
     """Final judgement on a single claim."""
     label: str              # SUPPORTED | CONTRADICTED | UNVERIFIABLE | NO_EVIDENCE
     confidence: float       # 0.0 – 1.0 calibrated
+    uncertainty: float      # 0.0 – 1.0 (higher = less reliable)
+    stability: float        # 0.0 – 1.0 (higher = more stable)
     best_evidence: Optional[Evidence]
     nli_scores: dict        # aggregated {entailment, neutral, contradiction}
     all_nli: List[NLIResult]
@@ -79,6 +81,8 @@ class VerdictEngine:
             return Verdict(
                 label="NO_EVIDENCE",
                 confidence=0.0,
+                uncertainty=1.0,
+                stability=0.0,
                 best_evidence=None,
                 nli_scores={"entailment": 0.0, "neutral": 1.0, "contradiction": 0.0},
                 all_nli=[],
@@ -132,23 +136,67 @@ class VerdictEngine:
             label = "UNVERIFIABLE"
             best_ev = best_support.evidence
 
-        # Step 4 — calibrated confidence (uses specificity-gated entailment)
+        # Step 4 — uncertainty signal (semantic-entropy proxy + disagreement)
+        uncertainty = self._uncertainty_score(nli_results)
+        stability = round(1.0 - uncertainty, 4)
+
+        # Step 5 — calibrated confidence (uses specificity-gated entailment)
         confidence = self._bayesian_confidence(
-            nli_results, evidence_list, max_specific_ent, max_con
+            nli_results, evidence_list, max_specific_ent, max_con, uncertainty
         )
 
         return Verdict(
             label=label,
             confidence=confidence,
+            uncertainty=uncertainty,
+            stability=stability,
             best_evidence=best_ev,
             nli_scores={
                 "entailment": round(max_specific_ent, 4),
                 "raw_entailment": round(max_raw_ent, 4),
                 "neutral": round(max(0, 1 - max_raw_ent - max_con), 4),
                 "contradiction": round(max_con, 4),
+                "uncertainty": uncertainty,
+                "stability": stability,
             },
             all_nli=nli_results,
         )
+
+    def _uncertainty_score(self, nli_results: List[NLIResult]) -> float:
+        """
+        Estimate uncertainty from NLI distribution entropy + inter-evidence disagreement.
+
+        This is a practical semantic-entropy proxy: if verdict probability mass is diffuse
+        and evidence pairs disagree, uncertainty should increase.
+        """
+        if not nli_results:
+            return 1.0
+
+        prob_matrix = np.array(
+            [[r.entailment, r.neutral, r.contradiction] for r in nli_results],
+            dtype=np.float32,
+        )
+
+        # Mean class probabilities across retrieved evidence.
+        mean_probs = np.mean(prob_matrix, axis=0)
+        mean_probs = np.clip(mean_probs, 1e-8, 1.0)
+        mean_probs = mean_probs / np.sum(mean_probs)
+
+        # Normalized entropy in [0,1].
+        entropy = float(-np.sum(mean_probs * np.log(mean_probs)) / np.log(3.0))
+
+        # Evidence disagreement based on contradiction/entailment spread.
+        disagreement = float(
+            0.5 * np.std(prob_matrix[:, 0]) + 0.5 * np.std(prob_matrix[:, 2])
+        )
+        disagreement = min(max(disagreement * 2.0, 0.0), 1.0)
+
+        cw = self.config.confidence
+        uncertainty = (
+            cw.uncertainty_entropy_weight * entropy
+            + cw.uncertainty_disagreement_weight * disagreement
+        )
+        return round(min(max(uncertainty, 0.0), 1.0), 4)
 
     # ------------------------------------------------------------------
     # NLI inference
@@ -192,6 +240,7 @@ class VerdictEngine:
         evidence_list: List[Evidence],
         max_ent: float,
         max_con: float,
+        uncertainty: float,
     ) -> float:
         """
         Fuse four signals:
@@ -199,6 +248,7 @@ class VerdictEngine:
           2. Retrieval relevance (best cosine similarity)
           3. Source reliability prior
           4. Cross-reference agreement (fraction of evidence that entails)
+          5. Uncertainty stability bonus (1 - uncertainty)
         """
         w = self.config.confidence
 
@@ -224,10 +274,14 @@ class VerdictEngine:
         )
         cross_ref = supporting / len(nli_results) if nli_results else 0.0
 
+        # Signal 5: uncertainty-aware stability
+        stability = 1.0 - uncertainty
+
         score = (
             w.w_nli * nli_support
             + w.w_retrieval * retrieval_rel
             + w.w_source * src_rel
             + w.w_cross_ref * cross_ref
+            + w.w_uncertainty * stability
         )
         return round(min(max(score, 0.0), 1.0), 4)

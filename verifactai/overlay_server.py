@@ -18,6 +18,7 @@ from typing import Any
 
 from config import Config
 from core.pipeline import VeriFactPipeline
+from core.risk_classifier import RiskClassifier
 from utils.runtime_safety import apply_runtime_safety_defaults
 
 apply_runtime_safety_defaults()
@@ -25,7 +26,9 @@ apply_runtime_safety_defaults()
 
 _PIPELINE: VeriFactPipeline | None = None
 _PIPELINE_LOCK = threading.Lock()
+_RISK_CLASSIFIER: RiskClassifier | None = None
 _API_TOKEN = os.environ.get("VERIFACT_API_TOKEN", "").strip()
+_ENABLE_RISK_CLASSIFIER = os.environ.get("VERIFACT_ENABLE_RISK_CLASSIFIER", "1") == "1"
 
 _ALLOWED_ORIGIN_PREFIXES = (
     "https://chatgpt.com",
@@ -41,6 +44,15 @@ def get_pipeline() -> VeriFactPipeline:
         if _PIPELINE is None:
             _PIPELINE = VeriFactPipeline(Config())
         return _PIPELINE
+
+
+def get_risk_classifier() -> RiskClassifier | None:
+    global _RISK_CLASSIFIER
+    if not _ENABLE_RISK_CLASSIFIER:
+        return None
+    if _RISK_CLASSIFIER is None:
+        _RISK_CLASSIFIER = RiskClassifier()
+    return _RISK_CLASSIFIER
 
 
 def summarize(result: Any) -> str:
@@ -84,6 +96,7 @@ def _severity_for_claim(verdict: str, confidence: float) -> str:
 
 
 def _build_alerts(flags: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    classifier = get_risk_classifier()
     alerts: list[dict[str, Any]] = []
     for flag in flags:
         verdict = str(flag.get("verdict") or "")
@@ -99,9 +112,23 @@ def _build_alerts(flags: list[dict[str, Any]]) -> list[dict[str, Any]]:
             category = "red_flag"
             message = "Verification red flag: claim lacks reliable support."
 
-        if _contains_bias_cue(claim):
+        classifier_hit = False
+        classifier_score = 0.0
+        if classifier is not None and classifier.available:
+            pred = classifier.predict(claim)
+            if pred is not None:
+                classifier_score = float(pred.score)
+                classifier_hit = pred.score >= 0.78 and any(
+                    x in pred.label for x in ("toxic", "insult", "hate", "offens")
+                )
+
+        if _contains_bias_cue(claim) or classifier_hit:
             category = "bias"
-            message = "Potential bias cue detected in phrasing."
+            message = (
+                "Potential bias cue detected in phrasing."
+                if not classifier_hit
+                else f"Classifier flagged potential biased/toxic phrasing (score={classifier_score:.2f})."
+            )
 
         if category == "ok":
             continue
@@ -113,6 +140,7 @@ def _build_alerts(flags: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "message": message,
                 "claim": claim,
                 "confidence": conf,
+                "classifier_score": round(classifier_score, 4),
             }
         )
 
@@ -143,6 +171,8 @@ def result_payload(result: Any, top_claims: int = 6) -> dict[str, Any]:
                 "evidence": (claim.best_evidence.text[:220] if claim.best_evidence else ""),
                 "source": (claim.best_evidence.source if claim.best_evidence else ""),
                 "url": (claim.best_evidence.url if claim.best_evidence else ""),
+                "uncertainty": float(claim.uncertainty or 0.0),
+                "stability": float(claim.stability or 0.0),
             }
         )
 
@@ -179,11 +209,17 @@ class OverlayHandler(BaseHTTPRequestHandler):
     def _json_response(self, code: int, payload: dict[str, Any]) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(code)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        # CORS
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-VeriFact-Token")
+        # Security headers
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Referrer-Policy", "no-referrer")
         self.end_headers()
         self.wfile.write(body)
 
@@ -214,6 +250,13 @@ class OverlayHandler(BaseHTTPRequestHandler):
 
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
+
+            # Request size limit: 100KB max
+            MAX_BODY = 100_000
+            if content_length > MAX_BODY:
+                self._json_response(413, {"error": f"Request too large (max {MAX_BODY} bytes)"})
+                return
+
             raw = self.rfile.read(content_length)
             payload = json.loads(raw.decode("utf-8")) if raw else {}
 
@@ -222,18 +265,42 @@ class OverlayHandler(BaseHTTPRequestHandler):
                 self._json_response(400, {"error": "text is required"})
                 return
 
-            top_claims = int(payload.get("top_claims", 6))
+            # Text length limit: 50,000 chars
+            MAX_TEXT = 50_000
+            if len(text) > MAX_TEXT:
+                self._json_response(400, {"error": f"Text too long (max {MAX_TEXT} chars)"})
+                return
+
+            top_claims = min(int(payload.get("top_claims", 6)), 20)  # Cap at 20
             pipeline = get_pipeline()
             result = pipeline.verify_text(text)
             self._json_response(200, result_payload(result, top_claims=top_claims))
+        except json.JSONDecodeError:
+            self._json_response(400, {"error": "Invalid JSON body"})
         except Exception as exc:
             self._json_response(500, {"error": str(exc)})
 
 
 def run(host: str = "127.0.0.1", port: int = 8765) -> None:
+    import signal
+
     server = ThreadingHTTPServer((host, port), OverlayHandler)
     print(f"VeriFact overlay server listening on http://{host}:{port}")
-    server.serve_forever()
+    print(f"  Security: origin whitelist, request size limit 100KB, text limit 50K chars")
+    print(f"  Press Ctrl+C to stop")
+
+    def _shutdown(signum, frame):
+        print("\nShutting down gracefully...")
+        server.shutdown()
+
+    signal.signal(signal.SIGINT, _shutdown)
+    signal.signal(signal.SIGTERM, _shutdown)
+
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+        print("Server stopped.")
 
 
 if __name__ == "__main__":

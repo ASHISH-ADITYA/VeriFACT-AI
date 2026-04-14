@@ -91,6 +91,8 @@ class VeriFactPipeline:
             verdict = self.verdict_engine.judge(claim, claim.evidence)
             claim.verdict = verdict.label
             claim.confidence = verdict.confidence
+            claim.uncertainty = verdict.uncertainty
+            claim.stability = verdict.stability
             claim.best_evidence = verdict.best_evidence
             claim.nli_scores = verdict.nli_scores
             claim.all_nli_results = verdict.all_nli

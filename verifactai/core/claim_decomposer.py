@@ -40,6 +40,8 @@ class Claim:
     best_evidence: Optional[object] = None
     nli_scores: Optional[dict] = None
     all_nli_results: Optional[list] = None
+    uncertainty: Optional[float] = None
+    stability: Optional[float] = None
     correction: Optional[str] = None
 
 

@@ -120,14 +120,18 @@ class NLIConfig(BaseModel):
 
 class ConfidenceConfig(BaseModel):
     """Bayesian confidence scoring weights."""
-    w_nli: float = 0.40
-    w_retrieval: float = 0.25
-    w_source: float = 0.15
-    w_cross_ref: float = 0.20
+    w_nli: float = 0.32
+    w_retrieval: float = 0.22
+    w_source: float = 0.12
+    w_cross_ref: float = 0.16
+    w_uncertainty: float = 0.18
 
     verified_threshold: float = 0.75
     uncertain_lower: float = 0.40
     hallucination_threshold: float = 0.50  # for evaluation binary classification (tuned down from 0.60)
+
+    uncertainty_entropy_weight: float = 0.65
+    uncertainty_disagreement_weight: float = 0.35
 
     source_reliability: Dict[str, float] = Field(default_factory=lambda: {
         "wikipedia": 1.0,

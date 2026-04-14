@@ -245,6 +245,8 @@ function renderPanel(result) {
 
   const claims = (result.flags || []).map((c) => {
     const confPct = Math.round((c.confidence || 0) * 100);
+    const uncPct = Math.round((c.uncertainty || 0) * 100);
+    const stabPct = Math.round((c.stability || 0) * 100);
     const sourceLine = c.url
       ? `<div style="margin-top:4px;"><strong>Source:</strong> <a href="${String(c.url).replace(/"/g, "&quot;")}" target="_blank" rel="noopener noreferrer" style="color:#93c5fd;">${String(c.source || "reference").replace(/</g, "&lt;")}</a></div>`
       : (c.source ? `<div style="margin-top:4px;"><strong>Source:</strong> ${String(c.source).replace(/</g, "&lt;")}</div>` : "");
@@ -253,6 +255,7 @@ function renderPanel(result) {
         <div><strong>${c.verdict}</strong> (${confPct}%)</div>
         <div>${(c.claim || "").replace(/</g, "&lt;")}</div>
         <div style="margin-top:4px;opacity:0.9;"><strong>Reason:</strong> ${reasonForClaim(c)}</div>
+        <div style="margin-top:4px;opacity:0.9;"><strong>Uncertainty:</strong> ${uncPct}% &nbsp; <strong>Stability:</strong> ${stabPct}%</div>
         ${c.correction ? `<div style="margin-top:4px;"><strong>Suggested correction:</strong> ${String(c.correction).replace(/</g, "&lt;")}</div>` : ""}
         ${c.evidence ? `<div style="margin-top:4px;"><strong>Support:</strong> ${String(c.evidence).replace(/</g, "&lt;")}</div>` : ""}
         ${sourceLine}
