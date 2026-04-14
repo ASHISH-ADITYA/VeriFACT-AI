@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r verifactai/requirements.txt
+          pip install pytest
+          python -m spacy download en_core_web_sm
+
+      - name: Syntax check all Python files
+        run: |
+          python -m py_compile verifactai/config.py
+          python -m py_compile verifactai/app.py
+          python -m py_compile verifactai/overlay_server.py
+          python -m py_compile verifactai/smoke_test.py
+          python -m py_compile verifactai/core/pipeline.py
+          python -m py_compile verifactai/core/claim_decomposer.py
+          python -m py_compile verifactai/core/evidence_retriever.py
+          python -m py_compile verifactai/core/verdict_engine.py
+          python -m py_compile verifactai/core/annotator.py
+          python -m py_compile verifactai/core/llm_client.py
+          python -m py_compile verifactai/evaluation/evaluate.py
+          python -m py_compile verifactai/evaluation/metrics.py
+          python -m py_compile verifactai/evaluation/plots.py
+
+      - name: Run unit tests
+        working-directory: verifactai
+        run: python -m pytest tests/test_pipeline.py -v
+
+      - name: Verify imports
+        working-directory: verifactai
+        env:
+          PYTHONPATH: .
+        run: |
+          python -c "
+          from config import cfg, Profile, PROFILES
+          from core.claim_decomposer import ClaimDecomposer, Claim
+          from core.evidence_retriever import EvidenceRetriever
+          from core.verdict_engine import VerdictEngine
+          from core.annotator import AnnotatedOutputGenerator
+          from core.pipeline import VeriFactPipeline
+          from evaluation.metrics import binary_hallucination_metrics, expected_calibration_error
+          print('All imports OK')
+          "
