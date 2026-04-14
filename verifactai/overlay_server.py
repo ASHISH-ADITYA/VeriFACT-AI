@@ -337,16 +337,24 @@ class OverlayHandler(BaseHTTPRequestHandler):
             self._json_response(500, {"error": str(exc)})
 
 
-def run(host: str = "127.0.0.1", port: int = 8765) -> None:
+def run() -> None:
     import signal
 
+    host = os.environ.get("VERIFACT_HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", os.environ.get("VERIFACT_PORT", "8765")))
+
     server = ThreadingHTTPServer((host, port), OverlayHandler)
-    print(f"VeriFact overlay server listening on http://{host}:{port}")
-    print("  Security: origin whitelist, request size limit 100KB, text limit 50K chars")
+
+    print("=" * 50)
+    print("  VeriFACT AI — API Server")
+    print("=" * 50)
+    print(f"  Listening on http://{host}:{port}")
+    print(f"  Rate limit: {_RATE_LIMIT} req/min per IP")
     print("  Press Ctrl+C to stop")
+    print("=" * 50)
 
     def _shutdown(signum, frame):
-        print("\nShutting down gracefully...")
+        print("\nShutting down...")
         server.shutdown()
 
     signal.signal(signal.SIGINT, _shutdown)
@@ -356,7 +364,6 @@ def run(host: str = "127.0.0.1", port: int = 8765) -> None:
         server.serve_forever()
     finally:
         server.server_close()
-        print("Server stopped.")
 
 
 if __name__ == "__main__":

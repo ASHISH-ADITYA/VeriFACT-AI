@@ -1,0 +1,10 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "cd /app/verifactai && python overlay_server.py"
+healthcheckPath = "/health"
+healthcheckTimeout = 90
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
