@@ -1,29 +1,0 @@
-127.0.0.1 - - [14/Apr/2026 03:06:33] "GET /health HTTP/1.1" 200 -
-127.0.0.1 - - [14/Apr/2026 03:06:33] "GET /health HTTP/1.1" 200 -
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-VeriFact overlay server listening on http://127.0.0.1:8765
-03:06:33 | INFO     | Initialising VeriFactPipeline (profile=interactive, provider=ollama, model=llama3.1:8b)
-03:06:33 | INFO     | Ollama configured (model=llama3.1:8b, url=http://localhost:11434)
-03:06:33 | INFO     | ClaimDecomposer initialised
-03:06:33 | INFO     | Loading embedding model: sentence-transformers/all-MiniLM-L6-v2
-Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 6959.43it/s]
-[1mBertModel LOAD REPORT[0m from: sentence-transformers/all-MiniLM-L6-v2
-Key                     | Status     |  | 
-------------------------+------------+--+-
-embeddings.position_ids | UNEXPECTED |  | 
-
-Notes:
-- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
-03:06:42 | WARNING  | FAISS index not found at data/index/knowledge.index. Run data/build_index.py first.
-03:06:42 | INFO     | Loading NLI model: cross-encoder/nli-deberta-v3-base
-Loading weights:   0%|          | 0/202 [00:00<?, ?it/s]Loading weights: 100%|██████████| 202/202 [00:00<00:00, 7075.57it/s]
-[1mDebertaV2ForSequenceClassification LOAD REPORT[0m from: cross-encoder/nli-deberta-v3-base
-Key                             | Status     |  | 
---------------------------------+------------+--+-
-deberta.embeddings.position_ids | UNEXPECTED |  | 
-
-Notes:
-- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
-127.0.0.1 - - [14/Apr/2026 03:06:56] "POST /analyze HTTP/1.1" 200 -
-/opt/homebrew/Cellar/python@3.11/3.11.14_3/Frameworks/Python.framework/Versions/3.11/lib/python3.11/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
-  warnings.warn('resource_tracker: There appear to be %d '
