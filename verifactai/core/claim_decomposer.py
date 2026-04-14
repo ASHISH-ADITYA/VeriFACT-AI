@@ -13,36 +13,40 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import TYPE_CHECKING
 
 import spacy
 
-from core.llm_client import LLMClient
 from utils.helpers import logger, timed
+
+if TYPE_CHECKING:
+    from core.llm_client import LLMClient
 
 # ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Claim:
     """A single atomic factual claim extracted from LLM output."""
-    id: str                              # stable identifier e.g. "c-0", "c-1"
-    text: str                            # self-contained factual statement
-    source_sentence: str                 # original sentence it came from
-    claim_type: str = "entity_fact"      # entity_fact|numerical|temporal|causal|relational
-    char_start: int = -1                 # start offset in original text
-    char_end: int = -1                   # end offset in original text
+
+    id: str  # stable identifier e.g. "c-0", "c-1"
+    text: str  # self-contained factual statement
+    source_sentence: str  # original sentence it came from
+    claim_type: str = "entity_fact"  # entity_fact|numerical|temporal|causal|relational
+    char_start: int = -1  # start offset in original text
+    char_end: int = -1  # end offset in original text
     # Filled downstream
     evidence: list = field(default_factory=list)
-    verdict: Optional[str] = None
-    confidence: Optional[float] = None
-    best_evidence: Optional[object] = None
-    nli_scores: Optional[dict] = None
-    all_nli_results: Optional[list] = None
-    uncertainty: Optional[float] = None
-    stability: Optional[float] = None
-    correction: Optional[str] = None
+    verdict: str | None = None
+    confidence: float | None = None
+    best_evidence: object | None = None
+    nli_scores: dict | None = None
+    all_nli_results: list | None = None
+    uncertainty: float | None = None
+    stability: float | None = None
+    correction: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -86,11 +90,22 @@ OUTPUT — strict JSON array, nothing else:
 ]
 """
 
-_HEDGE_WORDS = frozenset([
-    "might", "maybe", "possibly", "perhaps", "probably",
-    "i think", "it seems", "allegedly", "reportedly",
-    "could be", "may be", "it is believed",
-])
+_HEDGE_WORDS = frozenset(
+    [
+        "might",
+        "maybe",
+        "possibly",
+        "perhaps",
+        "probably",
+        "i think",
+        "it seems",
+        "allegedly",
+        "reportedly",
+        "could be",
+        "may be",
+        "it is believed",
+    ]
+)
 
 
 class ClaimDecomposer:
@@ -103,7 +118,7 @@ class ClaimDecomposer:
 
     # ------------------------------------------------------------------
     @timed
-    def decompose(self, text: str) -> List[Claim]:
+    def decompose(self, text: str) -> list[Claim]:
         """Primary entry point — LLM extraction with spaCy fallback."""
         try:
             claims = self._llm_decompose(text)
@@ -120,7 +135,7 @@ class ClaimDecomposer:
     # ------------------------------------------------------------------
     # LLM-based extraction
     # ------------------------------------------------------------------
-    def _llm_decompose(self, text: str) -> List[Claim]:
+    def _llm_decompose(self, text: str) -> list[Claim]:
         raw = self.llm.generate(
             system=_SYSTEM_PROMPT,
             user=f"Extract all factual claims from this text:\n\n{text}",
@@ -128,37 +143,41 @@ class ClaimDecomposer:
             max_tokens=2048,
         )
         parsed = self._parse_json(raw)
-        claims: List[Claim] = []
+        claims: list[Claim] = []
         for idx, item in enumerate(parsed):
             start, end = self._locate_span(text, item.get("source_sentence", ""))
-            claims.append(Claim(
-                id=f"c-{idx}",
-                text=item["claim"],
-                source_sentence=item.get("source_sentence", ""),
-                claim_type=item.get("claim_type", "entity_fact"),
-                char_start=start,
-                char_end=end,
-            ))
+            claims.append(
+                Claim(
+                    id=f"c-{idx}",
+                    text=item["claim"],
+                    source_sentence=item.get("source_sentence", ""),
+                    claim_type=item.get("claim_type", "entity_fact"),
+                    char_start=start,
+                    char_end=end,
+                )
+            )
         return claims
 
     # ------------------------------------------------------------------
     # Fallback: spaCy sentence segmentation + heuristic filter
     # ------------------------------------------------------------------
-    def _fallback_decompose(self, text: str) -> List[Claim]:
+    def _fallback_decompose(self, text: str) -> list[Claim]:
         doc = self._nlp(text)
-        claims: List[Claim] = []
+        claims: list[Claim] = []
         for idx, sent in enumerate(doc.sents):
             s = sent.text.strip()
             if self._should_skip(s):
                 continue
-            claims.append(Claim(
-                id=f"c-{idx}",
-                text=s,
-                source_sentence=s,
-                claim_type="entity_fact",
-                char_start=sent.start_char,
-                char_end=sent.end_char,
-            ))
+            claims.append(
+                Claim(
+                    id=f"c-{idx}",
+                    text=s,
+                    source_sentence=s,
+                    claim_type="entity_fact",
+                    char_start=sent.start_char,
+                    char_end=sent.end_char,
+                )
+            )
         return claims
 
     # ------------------------------------------------------------------

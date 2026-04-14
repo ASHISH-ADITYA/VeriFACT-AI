@@ -13,10 +13,12 @@ import json
 import re
 import urllib.error
 import urllib.request
-from typing import Optional
+from typing import TYPE_CHECKING
 
-from config import LLMConfig
 from utils.helpers import logger, retry_with_backoff
+
+if TYPE_CHECKING:
+    from config import LLMConfig
 
 
 class LLMClient:
@@ -43,19 +45,27 @@ class LLMClient:
             self._try_init("openai")
 
         if not self._clients:
-            logger.warning("No LLM providers initialised. Decomposition will use spaCy fallback only.")
+            logger.warning(
+                "No LLM providers initialised. Decomposition will use spaCy fallback only."
+            )
 
     def _try_init(self, provider: str) -> None:
         try:
             if provider == "ollama":
                 self._clients["ollama"] = {"base_url": self.config.ollama_base_url.rstrip("/")}
-                logger.info(f"Ollama configured (model={self.config.model}, url={self.config.ollama_base_url})")
+                logger.info(
+                    f"Ollama configured (model={self.config.model}, url={self.config.ollama_base_url})"
+                )
             elif provider == "anthropic":
                 import anthropic
-                self._clients["anthropic"] = anthropic.Anthropic(api_key=self.config.anthropic_api_key)
+
+                self._clients["anthropic"] = anthropic.Anthropic(
+                    api_key=self.config.anthropic_api_key
+                )
                 logger.info(f"Anthropic initialised (model={self.config.model})")
             elif provider == "openai":
                 import openai
+
                 self._clients["openai"] = openai.OpenAI(api_key=self.config.openai_api_key)
                 logger.info(f"OpenAI initialised (model={self.config.model})")
             else:
@@ -73,7 +83,7 @@ class LLMClient:
         temperature: float | None = None,
         max_tokens: int | None = None,
         strict: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Generate a completion.
 
@@ -89,7 +99,9 @@ class LLMClient:
 
         if strict:
             return self._call_strict(user=user, system=system, temperature=temp, max_tokens=tokens)
-        return self._call_with_fallback(user=user, system=system, temperature=temp, max_tokens=tokens)
+        return self._call_with_fallback(
+            user=user, system=system, temperature=temp, max_tokens=tokens
+        )
 
     # ------------------------------------------------------------------
     # Strict mode (eval): primary only, raise on failure
@@ -114,7 +126,7 @@ class LLMClient:
     # ------------------------------------------------------------------
     def _call_with_fallback(
         self, *, user: str, system: str, temperature: float, max_tokens: int
-    ) -> Optional[str]:
+    ) -> str | None:
         # Build ordered fallback chain: primary first, then others
         chain = [self._primary_provider]
         for p in ["ollama", "anthropic", "openai"]:
@@ -137,7 +149,9 @@ class LLMClient:
                     base_delay=0.5,
                 )
                 if provider != self._primary_provider:
-                    logger.warning(f"Fallback: using {provider} (primary {self._primary_provider} failed)")
+                    logger.warning(
+                        f"Fallback: using {provider} (primary {self._primary_provider} failed)"
+                    )
                 return result
             except Exception as exc:
                 last_exc = exc
@@ -180,7 +194,9 @@ class LLMClient:
         model = self._resolve_model(provider)
         try:
             if provider == "ollama":
-                return self._call_ollama(user=user, system=system, temperature=temperature, max_tokens=max_tokens)
+                return self._call_ollama(
+                    user=user, system=system, temperature=temperature, max_tokens=max_tokens
+                )
             elif provider == "anthropic":
                 client = self._clients["anthropic"]
                 resp = client.messages.create(
@@ -216,9 +232,7 @@ class LLMClient:
     # ------------------------------------------------------------------
     # Ollama HTTP call
     # ------------------------------------------------------------------
-    def _call_ollama(
-        self, *, user: str, system: str, temperature: float, max_tokens: int
-    ) -> str:
+    def _call_ollama(self, *, user: str, system: str, temperature: float, max_tokens: int) -> str:
         base_url = self._clients["ollama"]["base_url"]
         payload = {
             "model": self.config.model,

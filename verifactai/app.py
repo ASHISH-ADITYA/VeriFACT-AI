@@ -8,7 +8,6 @@ Run: streamlit run app.py
 from __future__ import annotations
 
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -17,8 +16,8 @@ from utils.runtime_safety import apply_runtime_safety_defaults
 
 apply_runtime_safety_defaults()
 
-import plotly.graph_objects as go
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 # Ensure project root is importable
@@ -169,9 +168,11 @@ st.markdown(_CSS, unsafe_allow_html=True)
 # Pipeline initialisation (cached across reruns)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @st.cache_resource(show_spinner="Loading VeriFactAI models …")
 def _load_pipeline() -> VeriFactPipeline:
     return VeriFactPipeline(Config())
+
 
 pipeline = _load_pipeline()
 
@@ -229,6 +230,7 @@ with st.sidebar:
 
     def _check_ollama() -> bool:
         import urllib.request
+
         try:
             urllib.request.urlopen("http://localhost:11434/api/tags", timeout=3)
             return True
@@ -247,7 +249,9 @@ with st.sidebar:
 
     st.markdown(f"- Ollama: {'running' if ollama_ok else '**offline** — run `ollama serve`'}")
     st.markdown(f"- Model: `{pipeline.config.llm.model}`")
-    st.markdown(f"- FAISS index: {idx_size if idx_size else '**missing** — run `python data/build_index.py`'}")
+    st.markdown(
+        f"- FAISS index: {idx_size if idx_size else '**missing** — run `python data/build_index.py`'}"
+    )
     st.markdown(f"- Profile: `{pipeline.config.active_profile.value}`")
 
     st.markdown("---")
@@ -288,7 +292,7 @@ with col_input:
             height=140,
             placeholder="Paste any AI-generated text here …",
         )
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 with col_examples:
     st.markdown('<div class="vf-card">', unsafe_allow_html=True)
@@ -296,7 +300,7 @@ with col_examples:
     for label, text in EXAMPLES.items():
         if st.button(label, use_container_width=True):
             st.session_state["_example_text"] = text
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # Handle example button
 if "_example_text" in st.session_state:
@@ -335,22 +339,29 @@ if st.button("🔍 **Verify**", type="primary", use_container_width=True) and us
         st.markdown(
             f'<div style="text-align:center">'
             f'<span style="font-size:3.2rem;font-weight:700;color:{colour}">'
-            f'{score:.0f}</span>'
+            f"{score:.0f}</span>"
             f'<br/><span style="color:#666">Factuality Score</span></div>',
             unsafe_allow_html=True,
         )
 
     with c_chart:
-        fig = go.Figure(go.Pie(
-            labels=["Verified", "Contradicted", "Uncertain", "No Evidence"],
-            values=[result.supported, result.contradicted,
-                    result.unverifiable, result.no_evidence],
-            marker_colors=["#28a745", "#dc3545", "#ffc107", "#6c757d"],
-            hole=0.45,
-            textinfo="label+percent",
-        ))
+        fig = go.Figure(
+            go.Pie(
+                labels=["Verified", "Contradicted", "Uncertain", "No Evidence"],
+                values=[
+                    result.supported,
+                    result.contradicted,
+                    result.unverifiable,
+                    result.no_evidence,
+                ],
+                marker_colors=["#28a745", "#dc3545", "#ffc107", "#6c757d"],
+                hole=0.45,
+                textinfo="label+percent",
+            )
+        )
         fig.update_layout(
-            height=280, margin=dict(t=30, b=0, l=0, r=0),
+            height=280,
+            margin=dict(t=30, b=0, l=0, r=0),
             showlegend=False,
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -369,14 +380,16 @@ if st.button("🔍 **Verify**", type="primary", use_container_width=True) and us
     st.subheader("Claim Analysis")
 
     _ICONS = {
-        "SUPPORTED": "✅", "CONTRADICTED": "❌",
-        "UNVERIFIABLE": "⚠️", "NO_EVIDENCE": "❓",
+        "SUPPORTED": "✅",
+        "CONTRADICTED": "❌",
+        "UNVERIFIABLE": "⚠️",
+        "NO_EVIDENCE": "❓",
     }
 
     for claim in result.claims:
         icon = _ICONS.get(claim.verdict, "❓")
         conf = f"{claim.confidence * 100:.0f}%" if claim.confidence is not None else "—"
-        label = f'{icon}  **{claim.text[:90]}{"…" if len(claim.text) > 90 else ""}**  — {conf}'
+        label = f"{icon}  **{claim.text[:90]}{'…' if len(claim.text) > 90 else ''}**  — {conf}"
 
         with st.expander(label):
             st.markdown(f"**Full claim:** {claim.text}")
@@ -393,39 +406,45 @@ if st.button("🔍 **Verify**", type="primary", use_container_width=True) and us
                 st.error(f"**Suggested correction:** {claim.correction}")
 
             if claim.nli_scores:
-                fig_nli = go.Figure(go.Bar(
-                    x=[
-                        claim.nli_scores["entailment"],
-                        claim.nli_scores["neutral"],
-                        claim.nli_scores["contradiction"],
-                    ],
-                    y=["Entailment", "Neutral", "Contradiction"],
-                    orientation="h",
-                    marker_color=["#28a745", "#ffc107", "#dc3545"],
-                ))
+                fig_nli = go.Figure(
+                    go.Bar(
+                        x=[
+                            claim.nli_scores["entailment"],
+                            claim.nli_scores["neutral"],
+                            claim.nli_scores["contradiction"],
+                        ],
+                        y=["Entailment", "Neutral", "Contradiction"],
+                        orientation="h",
+                        marker_color=["#28a745", "#ffc107", "#dc3545"],
+                    )
+                )
                 fig_nli.update_layout(
-                    height=140, margin=dict(t=0, b=0, l=0, r=0),
+                    height=140,
+                    margin=dict(t=0, b=0, l=0, r=0),
                     xaxis=dict(range=[0, 1]),
                 )
                 st.plotly_chart(fig_nli, use_container_width=True)
 
     # ── Row 4: Confidence distribution ───────────────────────────────
     st.subheader("Confidence Distribution")
-    confidences = [
-        c.confidence * 100 for c in result.claims if c.confidence is not None
-    ]
+    confidences = [c.confidence * 100 for c in result.claims if c.confidence is not None]
     if confidences:
         fig_dist = px.histogram(
-            x=confidences, nbins=10,
+            x=confidences,
+            nbins=10,
             labels={"x": "Confidence (%)", "y": "Count"},
             color_discrete_sequence=["steelblue"],
         )
         fig_dist.add_vline(
-            x=75, line_dash="dash", line_color="green",
+            x=75,
+            line_dash="dash",
+            line_color="green",
             annotation_text="Verified",
         )
         fig_dist.add_vline(
-            x=40, line_dash="dash", line_color="red",
+            x=40,
+            line_dash="dash",
+            line_color="red",
             annotation_text="Unreliable",
         )
         fig_dist.update_layout(height=280)

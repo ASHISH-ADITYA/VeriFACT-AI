@@ -14,9 +14,9 @@ import subprocess
 import sys
 import threading
 import tkinter as tk
+import webbrowser
 from pathlib import Path
 from tkinter import messagebox
-import webbrowser
 
 ROOT = Path(__file__).resolve().parents[1]
 VENV_PY = ROOT.parent / "venv" / "bin" / "python"
@@ -81,28 +81,51 @@ class App(tk.Tk):
         self.mgr = ServiceManager()
 
         self.configure(bg="#0f172a")
-        tk.Label(self, text="VeriFact Desktop", fg="#f8fafc", bg="#0f172a", font=("Helvetica", 18, "bold")).pack(pady=14)
+        tk.Label(
+            self,
+            text="VeriFact Desktop",
+            fg="#f8fafc",
+            bg="#0f172a",
+            font=("Helvetica", 18, "bold"),
+        ).pack(pady=14)
 
         self.overlay_status = tk.StringVar(value="Background Analyzer: stopped")
         self.streamlit_status = tk.StringVar(value="Dashboard (optional): stopped")
 
         tk.Label(self, textvariable=self.overlay_status, fg="#e2e8f0", bg="#0f172a").pack()
-        tk.Label(self, textvariable=self.streamlit_status, fg="#e2e8f0", bg="#0f172a").pack(pady=(0, 14))
+        tk.Label(self, textvariable=self.streamlit_status, fg="#e2e8f0", bg="#0f172a").pack(
+            pady=(0, 14)
+        )
 
         row1 = tk.Frame(self, bg="#0f172a")
         row1.pack(pady=6)
-        tk.Button(row1, text="Start Analyzer", width=18, command=self.start_overlay).pack(side=tk.LEFT, padx=6)
-        tk.Button(row1, text="Stop Analyzer", width=18, command=self.stop_overlay).pack(side=tk.LEFT, padx=6)
+        tk.Button(row1, text="Start Analyzer", width=18, command=self.start_overlay).pack(
+            side=tk.LEFT, padx=6
+        )
+        tk.Button(row1, text="Stop Analyzer", width=18, command=self.stop_overlay).pack(
+            side=tk.LEFT, padx=6
+        )
 
         row2 = tk.Frame(self, bg="#0f172a")
         row2.pack(pady=6)
-        tk.Button(row2, text="Start Dashboard (Optional)", width=24, command=self.start_streamlit).pack(side=tk.LEFT, padx=6)
-        tk.Button(row2, text="Stop Dashboard", width=12, command=self.stop_streamlit).pack(side=tk.LEFT, padx=6)
+        tk.Button(
+            row2, text="Start Dashboard (Optional)", width=24, command=self.start_streamlit
+        ).pack(side=tk.LEFT, padx=6)
+        tk.Button(row2, text="Stop Dashboard", width=12, command=self.stop_streamlit).pack(
+            side=tk.LEFT, padx=6
+        )
 
         row3 = tk.Frame(self, bg="#0f172a")
         row3.pack(pady=10)
-        tk.Button(row3, text="Open Dashboard", width=18, command=lambda: webbrowser.open("http://127.0.0.1:8501")).pack(side=tk.LEFT, padx=6)
-        tk.Button(row3, text="Browser Setup", width=18, command=self.open_extension_guide).pack(side=tk.LEFT, padx=6)
+        tk.Button(
+            row3,
+            text="Open Dashboard",
+            width=18,
+            command=lambda: webbrowser.open("http://127.0.0.1:8501"),
+        ).pack(side=tk.LEFT, padx=6)
+        tk.Button(row3, text="Browser Setup", width=18, command=self.open_extension_guide).pack(
+            side=tk.LEFT, padx=6
+        )
 
         tk.Label(
             self,
@@ -157,8 +180,16 @@ class App(tk.Tk):
             messagebox.showerror("Error", f"Failed to stop dashboard:\n{exc}")
 
     def refresh_status(self) -> None:
-        self.overlay_status.set("Background Analyzer: running" if self.mgr.overlay_running() else "Background Analyzer: stopped")
-        self.streamlit_status.set("Dashboard (optional): running" if self.mgr.streamlit_running() else "Dashboard (optional): stopped")
+        self.overlay_status.set(
+            "Background Analyzer: running"
+            if self.mgr.overlay_running()
+            else "Background Analyzer: stopped"
+        )
+        self.streamlit_status.set(
+            "Dashboard (optional): running"
+            if self.mgr.streamlit_running()
+            else "Dashboard (optional): stopped"
+        )
         self.after(1500, self.refresh_status)
 
     def on_close(self) -> None:

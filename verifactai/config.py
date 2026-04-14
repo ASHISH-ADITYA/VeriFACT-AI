@@ -13,7 +13,6 @@ from __future__ import annotations
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Dict
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -29,8 +28,10 @@ load_dotenv(_PROJECT_ROOT / ".env")
 # Performance profiles — tuned for M4 16 GB
 # ---------------------------------------------------------------------------
 
+
 class Profile(str, Enum):
     """interactive = responsive demo; eval = full-quality benchmark."""
+
     INTERACTIVE = "interactive"
     EVAL = "eval"
 
@@ -41,7 +42,7 @@ class PerformanceProfile(BaseModel):
     embedding_batch_size: int
 
 
-PROFILES: Dict[Profile, PerformanceProfile] = {
+PROFILES: dict[Profile, PerformanceProfile] = {
     Profile.INTERACTIVE: PerformanceProfile(
         max_tokens=1024,
         retrieval_top_k=3,
@@ -59,8 +60,10 @@ PROFILES: Dict[Profile, PerformanceProfile] = {
 # Sub-configs
 # ---------------------------------------------------------------------------
 
+
 class LLMConfig(BaseModel):
     """LLM provider settings."""
+
     provider: str = Field(default_factory=lambda: os.getenv("LLM_PROVIDER", "ollama"))
     ollama_base_url: str = Field(
         default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -76,6 +79,7 @@ class LLMConfig(BaseModel):
 
 class EmbeddingConfig(BaseModel):
     """Sentence-transformer embedding settings."""
+
     model_name: str = Field(
         default_factory=lambda: os.getenv(
             "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
@@ -88,6 +92,7 @@ class EmbeddingConfig(BaseModel):
 
 class RetrievalConfig(BaseModel):
     """FAISS vector retrieval settings."""
+
     index_path: str = Field(
         default_factory=lambda: os.getenv(
             "FAISS_INDEX_PATH",
@@ -108,10 +113,9 @@ class RetrievalConfig(BaseModel):
 
 class NLIConfig(BaseModel):
     """Natural Language Inference model settings."""
+
     model_name: str = Field(
-        default_factory=lambda: os.getenv(
-            "NLI_MODEL", "cross-encoder/nli-deberta-v3-base"
-        )
+        default_factory=lambda: os.getenv("NLI_MODEL", "cross-encoder/nli-deberta-v3-base")
     )
     entailment_threshold: float = 0.65
     contradiction_threshold: float = 0.75
@@ -120,6 +124,7 @@ class NLIConfig(BaseModel):
 
 class ConfidenceConfig(BaseModel):
     """Bayesian confidence scoring weights."""
+
     w_nli: float = 0.32
     w_retrieval: float = 0.22
     w_source: float = 0.12
@@ -128,30 +133,71 @@ class ConfidenceConfig(BaseModel):
 
     verified_threshold: float = 0.75
     uncertain_lower: float = 0.40
-    hallucination_threshold: float = 0.50  # for evaluation binary classification (tuned down from 0.60)
+    hallucination_threshold: float = (
+        0.50  # for evaluation binary classification (tuned down from 0.60)
+    )
 
     uncertainty_entropy_weight: float = 0.65
     uncertainty_disagreement_weight: float = 0.35
 
-    source_reliability: Dict[str, float] = Field(default_factory=lambda: {
-        "wikipedia": 1.0,
-        "pubmed": 1.0,
-        "openstax": 0.95,
-        "unknown": 0.50,
-    })
+    source_reliability: dict[str, float] = Field(
+        default_factory=lambda: {
+            "wikipedia": 1.0,
+            "pubmed": 1.0,
+            "openstax": 0.95,
+            "unknown": 0.50,
+        }
+    )
+
+
+class SelfCheckConfig(BaseModel):
+    """Self-consistency sampling and semantic-entropy controls."""
+
+    enabled: bool = Field(default_factory=lambda: os.getenv("SELFCHECK_ENABLED", "1") == "1")
+    samples: int = Field(default_factory=lambda: int(os.getenv("SELFCHECK_SAMPLES", "5")))
+    min_valid_samples: int = Field(
+        default_factory=lambda: int(os.getenv("SELFCHECK_MIN_VALID", "3"))
+    )
+    max_evidence: int = Field(default_factory=lambda: int(os.getenv("SELFCHECK_MAX_EVIDENCE", "2")))
+    temperature_start: float = Field(
+        default_factory=lambda: float(os.getenv("SELFCHECK_TEMP_START", "0.1"))
+    )
+    temperature_step: float = Field(
+        default_factory=lambda: float(os.getenv("SELFCHECK_TEMP_STEP", "0.15"))
+    )
+    uncertainty_entropy_weight: float = Field(
+        default_factory=lambda: float(os.getenv("SELFCHECK_ENTROPY_WEIGHT", "0.6"))
+    )
+    uncertainty_disagreement_weight: float = Field(
+        default_factory=lambda: float(os.getenv("SELFCHECK_DISAGREEMENT_WEIGHT", "0.4"))
+    )
+    confidence_blend_weight: float = Field(
+        default_factory=lambda: float(os.getenv("SELFCHECK_CONF_BLEND", "0.2"))
+    )
+
+
+class ReflexionConfig(BaseModel):
+    """Critique-and-revise loop controls for contradiction corrections."""
+
+    enabled: bool = Field(default_factory=lambda: os.getenv("REFLEXION_ENABLED", "1") == "1")
+    max_rounds: int = Field(default_factory=lambda: int(os.getenv("REFLEXION_MAX_ROUNDS", "1")))
 
 
 # ---------------------------------------------------------------------------
 # Top-level config
 # ---------------------------------------------------------------------------
 
+
 class Config(BaseModel):
     """Top-level configuration container."""
+
     llm: LLMConfig = Field(default_factory=LLMConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     nli: NLIConfig = Field(default_factory=NLIConfig)
     confidence: ConfidenceConfig = Field(default_factory=ConfidenceConfig)
+    selfcheck: SelfCheckConfig = Field(default_factory=SelfCheckConfig)
+    reflexion: ReflexionConfig = Field(default_factory=ReflexionConfig)
 
     project_root: Path = _PROJECT_ROOT
     log_level: str = "INFO"

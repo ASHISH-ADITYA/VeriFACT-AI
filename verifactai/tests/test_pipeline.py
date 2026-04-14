@@ -12,10 +12,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.claim_decomposer import ClaimDecomposer, Claim
-
+from core.claim_decomposer import Claim, ClaimDecomposer
 
 # ── Claim decomposer tests ────────────────────────────────────────────
+
 
 class TestClaimDecomposer:
     """Test JSON parsing and span location (no LLM needed)."""
@@ -62,6 +62,7 @@ class TestClaimDecomposer:
 
 # ── Evidence / Verdict data model tests ───────────────────────────────
 
+
 class TestDataModels:
     def test_claim_defaults(self):
         c = Claim(id="c-0", text="test", source_sentence="test")
@@ -77,4 +78,5 @@ class TestDataModels:
 
 if __name__ == "__main__":
     import pytest
+
     pytest.main([__file__, "-v"])

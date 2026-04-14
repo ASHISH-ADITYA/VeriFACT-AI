@@ -4,12 +4,15 @@ Shared utilities: logging, timing, hashing, retry logic.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import time
-import functools
-from typing import Callable, TypeVar, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 T = TypeVar("T")
 
@@ -25,7 +28,7 @@ logger.add(
     format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {name}:{function}:{line} | {message}",
 )
 logger.add(
-    lambda msg: print(msg, end=""),   # also print INFO+ to console
+    lambda msg: print(msg, end=""),  # also print INFO+ to console
     level="INFO",
     format="{time:HH:mm:ss} | {level:<8} | {message}",
 )
@@ -33,6 +36,7 @@ logger.add(
 
 def timed(func: Callable[..., T]) -> Callable[..., T]:
     """Decorator that logs function execution time."""
+
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> T:
         start = time.perf_counter()
@@ -40,6 +44,7 @@ def timed(func: Callable[..., T]) -> Callable[..., T]:
         elapsed = time.perf_counter() - start
         logger.info(f"{func.__qualname__} completed in {elapsed:.3f}s")
         return result
+
     return wrapper
 
 
@@ -68,6 +73,4 @@ def retry_with_backoff(
                 f"Retrying in {delay:.1f}s …"
             )
             time.sleep(delay)
-    raise RuntimeError(
-        f"{func.__qualname__} failed after {attempts} attempts"
-    ) from last_exc
+    raise RuntimeError(f"{func.__qualname__} failed after {attempts} attempts") from last_exc

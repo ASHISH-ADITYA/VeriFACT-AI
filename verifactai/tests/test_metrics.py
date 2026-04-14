@@ -11,7 +11,6 @@ from evaluation.metrics import (
 
 
 class TestBinaryMetrics:
-
     def test_perfect_classification(self):
         y_true = [0, 0, 1, 1]
         y_pred = [0, 0, 1, 1]
@@ -48,7 +47,6 @@ class TestBinaryMetrics:
 
 
 class TestCalibrationError:
-
     def test_perfect_calibration(self):
         # If 80% confident claims are correct 80% of the time → ECE ≈ 0
         confidences = [0.8] * 10
@@ -65,7 +63,6 @@ class TestCalibrationError:
 
 
 class TestLatencyPercentiles:
-
     def test_basic(self):
         result = latency_percentiles([1.0, 2.0, 3.0, 4.0, 5.0])
         assert result["p50"] == 3.0
@@ -83,7 +80,6 @@ class TestLatencyPercentiles:
 
 
 class TestRetrievalRecall:
-
     def test_all_found(self):
         assert retrieval_recall_at_k([True, True, True]) == 1.0
 

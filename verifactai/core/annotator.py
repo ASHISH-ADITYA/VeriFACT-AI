@@ -12,22 +12,23 @@ Computes an overall Factuality Score (0–100).
 from __future__ import annotations
 
 import html
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any
 
-from core.claim_decomposer import Claim
-from core.llm_client import LLMClient
 from utils.helpers import logger
 
+if TYPE_CHECKING:
+    from core.claim_decomposer import Claim
+    from core.llm_client import LLMClient
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
 _VERDICT_STYLE = {
-    "SUPPORTED":    {"bg": "#d4edda", "icon": "&#10004;", "css": "verified"},
+    "SUPPORTED": {"bg": "#d4edda", "icon": "&#10004;", "css": "verified"},
     "CONTRADICTED": {"bg": "#f8d7da", "icon": "&#10008;", "css": "contradicted"},
-    "UNVERIFIABLE": {"bg": "#fff3cd", "icon": "&#9888;",  "css": "unverifiable"},
-    "NO_EVIDENCE":  {"bg": "#e2e3e5", "icon": "&#63;",    "css": "no-evidence"},
+    "UNVERIFIABLE": {"bg": "#fff3cd", "icon": "&#9888;", "css": "unverifiable"},
+    "NO_EVIDENCE": {"bg": "#e2e3e5", "icon": "&#63;", "css": "no-evidence"},
 }
 
 _CORRECTION_PROMPT = """\
@@ -39,25 +40,44 @@ Contradicting evidence: {evidence}
 
 Correction:"""
 
+_REFLEXION_CRITIQUE_PROMPT = """\
+You are reviewing a factual correction for precision and grounding.
+Identify if the draft includes unsupported details, overclaims, or ambiguity.
+
+Claim: {claim}
+Evidence: {evidence}
+Draft correction: {draft}
+
+Return only JSON:
+{{
+    "issues": ["short issue", "short issue"],
+    "revised_correction": "improved 1-2 sentence correction grounded only in the evidence"
+}}"""
+
 
 class AnnotatedOutputGenerator:
     """Produce annotated HTML and structured JSON from verified claims."""
 
-    def __init__(self, llm: LLMClient | None = None) -> None:
+    def __init__(
+        self,
+        llm: LLMClient | None = None,
+        reflexion_enabled: bool = True,
+        reflexion_rounds: int = 1,
+    ) -> None:
         self.llm = llm  # optional — used for correction generation
+        self.reflexion_enabled = reflexion_enabled
+        self.reflexion_rounds = max(reflexion_rounds, 0)
 
     # ------------------------------------------------------------------
     # HTML annotation
     # ------------------------------------------------------------------
-    def generate_html(self, original_text: str, claims: List[Claim]) -> str:
+    def generate_html(self, original_text: str, claims: list[Claim]) -> str:
         """Return HTML string with colour-coded claim spans + tooltips."""
         if not claims:
             return html.escape(original_text)
 
         # Sort claims by char_start to process left-to-right
-        annotated_claims = [
-            c for c in claims if c.char_start >= 0 and c.char_end > c.char_start
-        ]
+        annotated_claims = [c for c in claims if c.char_start >= 0 and c.char_end > c.char_start]
         annotated_claims.sort(key=lambda c: c.char_start)
 
         parts: list[str] = []
@@ -66,10 +86,12 @@ class AnnotatedOutputGenerator:
         for claim in annotated_claims:
             # text before this claim span
             if claim.char_start > cursor:
-                parts.append(html.escape(original_text[cursor:claim.char_start]))
+                parts.append(html.escape(original_text[cursor : claim.char_start]))
 
-            style = _VERDICT_STYLE.get(claim.verdict or "NO_EVIDENCE", _VERDICT_STYLE["NO_EVIDENCE"])
-            span_text = html.escape(original_text[claim.char_start:claim.char_end])
+            style = _VERDICT_STYLE.get(
+                claim.verdict or "NO_EVIDENCE", _VERDICT_STYLE["NO_EVIDENCE"]
+            )
+            span_text = html.escape(original_text[claim.char_start : claim.char_end])
 
             ev_snippet = ""
             source_info = ""
@@ -93,7 +115,7 @@ class AnnotatedOutputGenerator:
                 f'style="background-color:{style["bg"]}; padding:2px 4px; '
                 f'border-radius:3px; cursor:help;" '
                 f'title="{tooltip}">'
-                f'{style["icon"]} {span_text}</span>'
+                f"{style['icon']} {span_text}</span>"
             )
             cursor = claim.char_end
 
@@ -106,7 +128,7 @@ class AnnotatedOutputGenerator:
     # ------------------------------------------------------------------
     # JSON report
     # ------------------------------------------------------------------
-    def generate_json(self, original_text: str, claims: List[Claim]) -> Dict[str, Any]:
+    def generate_json(self, original_text: str, claims: list[Claim]) -> dict[str, Any]:
         """Structured JSON report suitable for API response or export."""
         supported = sum(1 for c in claims if c.verdict == "SUPPORTED")
         contradicted = sum(1 for c in claims if c.verdict == "CONTRADICTED")
@@ -116,13 +138,15 @@ class AnnotatedOutputGenerator:
 
         factuality = (supported / total * 100) if total else 0.0
 
-        claims_data: List[Dict[str, Any]] = []
+        claims_data: list[dict[str, Any]] = []
         for c in claims:
-            entry: Dict[str, Any] = {
+            entry: dict[str, Any] = {
                 "id": c.id,
                 "claim": c.text,
                 "verdict": c.verdict,
                 "confidence": c.confidence,
+                "uncertainty": c.uncertainty,
+                "stability": c.stability,
                 "claim_type": c.claim_type,
                 "source_sentence": c.source_sentence,
                 "span": {"start": c.char_start, "end": c.char_end},
@@ -155,7 +179,7 @@ class AnnotatedOutputGenerator:
     # ------------------------------------------------------------------
     # Correction generation (for contradicted claims)
     # ------------------------------------------------------------------
-    def generate_corrections(self, claims: List[Claim]) -> None:
+    def generate_corrections(self, claims: list[Claim]) -> None:
         """Fill in .correction for every CONTRADICTED claim (in-place)."""
         if self.llm is None:
             return
@@ -167,12 +191,66 @@ class AnnotatedOutputGenerator:
                     claim=claim.text,
                     evidence=claim.best_evidence.text,
                 )
-                claim.correction = self.llm.generate(
+                correction = self.llm.generate(
                     user=prompt,
                     system="You are a concise fact-checker.",
                     temperature=0.0,
                     max_tokens=256,
                 )
+                if correction is None:
+                    claim.correction = None
+                    continue
+                claim.correction = correction.strip()
+
+                if self.reflexion_enabled and self.reflexion_rounds > 0:
+                    claim.correction = self._refine_correction(claim)
             except Exception as exc:
                 logger.warning(f"Correction generation failed for {claim.id}: {exc}")
                 claim.correction = None
+
+    def _refine_correction(self, claim: Claim) -> str | None:
+        """Run a small critique-revise loop to reduce unsupported wording."""
+        current = claim.correction
+        if not current or self.llm is None or not claim.best_evidence:
+            return current
+
+        for _ in range(self.reflexion_rounds):
+            critique_prompt = _REFLEXION_CRITIQUE_PROMPT.format(
+                claim=claim.text,
+                evidence=claim.best_evidence.text,
+                draft=current,
+            )
+            raw = self.llm.generate(
+                user=critique_prompt,
+                system="You are a strict factual editor.",
+                temperature=0.0,
+                max_tokens=256,
+            )
+            if not raw:
+                break
+
+            revised = self._extract_revised_correction(raw)
+            if not revised:
+                break
+            current = revised
+
+        return current
+
+    @staticmethod
+    def _extract_revised_correction(raw: str) -> str | None:
+        text = raw.strip()
+        try:
+            import json
+
+            parsed = json.loads(text)
+            revised = str(parsed.get("revised_correction", "")).strip()
+            return revised or None
+        except Exception:
+            pass
+
+        marker = "revised_correction"
+        if marker in text:
+            tail = text.split(marker, 1)[-1]
+            tail = tail.replace(":", " ").strip().strip('"')
+            return tail if tail else None
+        return None

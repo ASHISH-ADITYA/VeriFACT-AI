@@ -9,7 +9,6 @@ This module is intentionally optional and fail-soft:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from utils.helpers import logger
 
@@ -49,7 +48,7 @@ class RiskClassifier:
     def available(self) -> bool:
         return self._available and self._pipeline is not None
 
-    def predict(self, text: str) -> Optional[RiskPrediction]:
+    def predict(self, text: str) -> RiskPrediction | None:
         if not self.available:
             return None
         if not text or len(text.strip()) < 6:

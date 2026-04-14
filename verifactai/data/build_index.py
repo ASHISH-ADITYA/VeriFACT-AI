@@ -52,12 +52,14 @@ def chunk_text(
         chunk_words = words[i : i + chunk_size]
         if len(chunk_words) < min_words:
             continue
-        chunks.append({
-            "text": " ".join(chunk_words),
-            "source": source,
-            "title": title,
-            "url": url,
-        })
+        chunks.append(
+            {
+                "text": " ".join(chunk_words),
+                "source": source,
+                "title": title,
+                "url": url,
+            }
+        )
     return chunks
 
 
@@ -78,7 +80,9 @@ def load_wikipedia(max_articles: int | None = None) -> list[dict]:
         try:
             print(f"       Trying {repo} / {config} …")
             wiki = load_dataset(
-                repo, config, split="train",
+                repo,
+                config,
+                split="train",
                 trust_remote_code=True,
                 storage_options={"client_kwargs": {"timeout": 300}},
             )
@@ -107,8 +111,12 @@ def load_wikipedia(max_articles: int | None = None) -> list[dict]:
         url = f"https://simple.wikipedia.org/wiki/{title.replace(' ', '_')}"
         all_chunks.extend(
             chunk_text(
-                text, title, "wikipedia", url,
-                cfg.retrieval.chunk_size, cfg.retrieval.chunk_overlap,
+                text,
+                title,
+                "wikipedia",
+                url,
+                cfg.retrieval.chunk_size,
+                cfg.retrieval.chunk_overlap,
             )
         )
     print(f"       {len(all_chunks):,} Wikipedia chunks created")
@@ -139,8 +147,12 @@ def load_pubmed() -> list[dict]:
         title = item.get("question", "PubMed Abstract")
         all_chunks.extend(
             chunk_text(
-                context_text, title, "pubmed", url,
-                cfg.retrieval.chunk_size, cfg.retrieval.chunk_overlap,
+                context_text,
+                title,
+                "pubmed",
+                url,
+                cfg.retrieval.chunk_size,
+                cfg.retrieval.chunk_overlap,
             )
         )
     print(f"       {len(all_chunks):,} PubMed chunks created")
@@ -191,7 +203,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build VeriFactAI knowledge index")
     parser.add_argument("--wiki-only", action="store_true", help="Skip PubMed")
     parser.add_argument(
-        "--max-articles", type=int, default=None,
+        "--max-articles",
+        type=int,
+        default=None,
         help="Limit Wikipedia articles (for quick dev builds)",
     )
     args = parser.parse_args()

@@ -13,21 +13,24 @@ No circular LLM reasoning — verification uses a dedicated NLI model.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from config import Config
-from core.evidence_retriever import Evidence
-from core.claim_decomposer import Claim
 from utils.helpers import logger, timed
+
+if TYPE_CHECKING:
+    from config import Config
+    from core.claim_decomposer import Claim
+    from core.evidence_retriever import Evidence
 
 
 @dataclass
 class NLIResult:
     """NLI scores for a single (evidence, claim) pair."""
+
     evidence: Evidence
     entailment: float
     neutral: float
@@ -37,13 +40,14 @@ class NLIResult:
 @dataclass
 class Verdict:
     """Final judgement on a single claim."""
-    label: str              # SUPPORTED | CONTRADICTED | UNVERIFIABLE | NO_EVIDENCE
-    confidence: float       # 0.0 – 1.0 calibrated
-    uncertainty: float      # 0.0 – 1.0 (higher = less reliable)
-    stability: float        # 0.0 – 1.0 (higher = more stable)
-    best_evidence: Optional[Evidence]
-    nli_scores: dict        # aggregated {entailment, neutral, contradiction}
-    all_nli: List[NLIResult]
+
+    label: str  # SUPPORTED | CONTRADICTED | UNVERIFIABLE | NO_EVIDENCE
+    confidence: float  # 0.0 – 1.0 calibrated
+    uncertainty: float  # 0.0 – 1.0 (higher = less reliable)
+    stability: float  # 0.0 – 1.0 (higher = more stable)
+    best_evidence: Evidence | None
+    nli_scores: dict  # aggregated {entailment, neutral, contradiction}
+    all_nli: list[NLIResult]
 
 
 class VerdictEngine:
@@ -75,7 +79,7 @@ class VerdictEngine:
 
     # ------------------------------------------------------------------
     @timed
-    def judge(self, claim: Claim, evidence_list: List[Evidence]) -> Verdict:
+    def judge(self, claim: Claim, evidence_list: list[Evidence]) -> Verdict:
         """Produce a verdict for one claim against its retrieved evidence."""
         if not evidence_list:
             return Verdict(
@@ -103,12 +107,12 @@ class VerdictEngine:
 
         # For entailment, require specificity: entailment * similarity
         # This penalises high-NLI + low-similarity (topical but not specific)
-        SIMILARITY_GATE = 0.45  # tuned: P25 of correct-claim similarity is 0.53
+        similarity_gate = 0.45  # tuned: P25 of correct-claim similarity is 0.53
 
         specific_support_scores = []
         for r in nli_results:
             sim = r.evidence.similarity
-            if sim >= SIMILARITY_GATE and r.entailment > 0.5:
+            if sim >= similarity_gate and r.entailment > 0.5:
                 specific_support_scores.append(r.entailment * sim)
             else:
                 specific_support_scores.append(0.0)
@@ -117,9 +121,9 @@ class VerdictEngine:
         max_raw_ent = max(r.entailment for r in nli_results)
 
         best_support_idx = (
-            max(range(len(specific_support_scores)),
-                key=lambda i: specific_support_scores[i])
-            if specific_support_scores else 0
+            max(range(len(specific_support_scores)), key=lambda i: specific_support_scores[i])
+            if specific_support_scores
+            else 0
         )
         best_support = nli_results[best_support_idx]
 
@@ -162,7 +166,7 @@ class VerdictEngine:
             all_nli=nli_results,
         )
 
-    def _uncertainty_score(self, nli_results: List[NLIResult]) -> float:
+    def _uncertainty_score(self, nli_results: list[NLIResult]) -> float:
         """
         Estimate uncertainty from NLI distribution entropy + inter-evidence disagreement.
 
@@ -186,9 +190,7 @@ class VerdictEngine:
         entropy = float(-np.sum(mean_probs * np.log(mean_probs)) / np.log(3.0))
 
         # Evidence disagreement based on contradiction/entailment spread.
-        disagreement = float(
-            0.5 * np.std(prob_matrix[:, 0]) + 0.5 * np.std(prob_matrix[:, 2])
-        )
+        disagreement = float(0.5 * np.std(prob_matrix[:, 0]) + 0.5 * np.std(prob_matrix[:, 2]))
         disagreement = min(max(disagreement * 2.0, 0.0), 1.0)
 
         cw = self.config.confidence
@@ -201,9 +203,7 @@ class VerdictEngine:
     # ------------------------------------------------------------------
     # NLI inference
     # ------------------------------------------------------------------
-    def _batch_nli(
-        self, claim_text: str, evidence_list: List[Evidence]
-    ) -> List[NLIResult]:
+    def _batch_nli(self, claim_text: str, evidence_list: list[Evidence]) -> list[NLIResult]:
         """Run NLI on all (evidence, claim) pairs in one batched forward pass."""
         premises = [ev.text for ev in evidence_list]
         hypotheses = [claim_text] * len(evidence_list)
@@ -221,14 +221,16 @@ class VerdictEngine:
             logits = self.model(**inputs).logits
             probs = torch.softmax(logits, dim=-1).cpu().numpy()
 
-        results: List[NLIResult] = []
-        for ev, p in zip(evidence_list, probs):
-            results.append(NLIResult(
-                evidence=ev,
-                contradiction=float(p[0]),
-                neutral=float(p[1]),
-                entailment=float(p[2]),
-            ))
+        results: list[NLIResult] = []
+        for ev, p in zip(evidence_list, probs, strict=False):
+            results.append(
+                NLIResult(
+                    evidence=ev,
+                    contradiction=float(p[0]),
+                    neutral=float(p[1]),
+                    entailment=float(p[2]),
+                )
+            )
         return results
 
     # ------------------------------------------------------------------
@@ -236,8 +238,8 @@ class VerdictEngine:
     # ------------------------------------------------------------------
     def _bayesian_confidence(
         self,
-        nli_results: List[NLIResult],
-        evidence_list: List[Evidence],
+        nli_results: list[NLIResult],
+        evidence_list: list[Evidence],
         max_ent: float,
         max_con: float,
         uncertainty: float,
@@ -256,21 +258,15 @@ class VerdictEngine:
         nli_support = (max_ent - max_con + 1.0) / 2.0  # map [-1,1] → [0,1]
 
         # Signal 2: retrieval relevance
-        retrieval_rel = max(
-            (ev.similarity for ev in evidence_list), default=0.0
-        )
+        retrieval_rel = max((ev.similarity for ev in evidence_list), default=0.0)
 
         # Signal 3: source reliability
-        src_scores = [
-            self._source_reliability.get(ev.source, 0.5)
-            for ev in evidence_list[:3]
-        ]
+        src_scores = [self._source_reliability.get(ev.source, 0.5) for ev in evidence_list[:3]]
         src_rel = float(np.mean(src_scores)) if src_scores else 0.5
 
         # Signal 4: cross-reference agreement
         supporting = sum(
-            1 for r in nli_results
-            if r.entailment > r.contradiction and r.entailment > 0.5
+            1 for r in nli_results if r.entailment > r.contradiction and r.entailment > 0.5
         )
         cross_ref = supporting / len(nli_results) if nli_results else 0.0
 

@@ -28,7 +28,6 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import List
 
 from tqdm import tqdm
 
@@ -44,17 +43,14 @@ from config import Config, Profile  # noqa: E402
 from core.pipeline import VeriFactPipeline  # noqa: E402
 from evaluation.metrics import (  # noqa: E402
     binary_hallucination_metrics,
-    expected_calibration_error,
     latency_percentiles,
     retrieval_recall_at_k,
 )
 from evaluation.plots import (  # noqa: E402
-    plot_factuality_distribution,
-    plot_verdict_breakdown,
     plot_confusion_matrix,
+    plot_factuality_distribution,
     plot_roc_curve,
-    plot_comparison,
-    plot_calibration,
+    plot_verdict_breakdown,
 )
 
 RESULTS_DIR = Path("assets/evaluation")
@@ -67,6 +63,7 @@ def _ensure_dirs() -> None:
 # ═══════════════════════════════════════════════════════════════════════
 # CORE BENCHMARK: TruthfulQA Fixed-Response (no generation variability)
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def evaluate_truthfulqa_fixed(
     pipeline: VeriFactPipeline,
@@ -90,11 +87,11 @@ def evaluate_truthfulqa_fixed(
     hal_threshold = threshold or pipeline.config.confidence.hallucination_threshold
     print(f"Samples: {len(ds)}, Hallucination threshold: {hal_threshold}")
 
-    y_true: List[int] = []
-    y_pred: List[int] = []
-    y_scores: List[float] = []
-    latencies: List[float] = []
-    retrieval_hits: List[bool] = []
+    y_true: list[int] = []
+    y_pred: list[int] = []
+    y_scores: list[float] = []
+    latencies: list[float] = []
+    retrieval_hits: list[bool] = []
 
     for item in tqdm(ds, desc="TruthfulQA-fixed"):
         best_answer = item.get("best_answer", "")
@@ -112,15 +109,15 @@ def evaluate_truthfulqa_fixed(
             flagged = correct_result.factuality_score < (hal_threshold * 100)
             y_pred.append(1 if flagged else 0)
             y_scores.append(1 - correct_result.factuality_score / 100)
-            retrieval_hits.extend(
-                bool(c.evidence) for c in correct_result.claims
-            )
+            retrieval_hits.extend(bool(c.evidence) for c in correct_result.claims)
         except Exception as exc:
             print(f"  Skip correct ({exc})")
             continue
 
         # Verify first incorrect answer
-        wrong_answer = incorrect_answers[0] if isinstance(incorrect_answers, list) else str(incorrect_answers)
+        wrong_answer = (
+            incorrect_answers[0] if isinstance(incorrect_answers, list) else str(incorrect_answers)
+        )
         try:
             t0 = time.perf_counter()
             wrong_result = pipeline.verify_text(wrong_answer)
@@ -130,9 +127,7 @@ def evaluate_truthfulqa_fixed(
             flagged = wrong_result.factuality_score < (hal_threshold * 100)
             y_pred.append(1 if flagged else 0)
             y_scores.append(1 - wrong_result.factuality_score / 100)
-            retrieval_hits.extend(
-                bool(c.evidence) for c in wrong_result.claims
-            )
+            retrieval_hits.extend(bool(c.evidence) for c in wrong_result.claims)
         except Exception as exc:
             print(f"  Skip incorrect ({exc})")
             continue
@@ -164,9 +159,8 @@ def evaluate_truthfulqa_fixed(
 # STRESS TEST: TruthfulQA Live Generation
 # ═══════════════════════════════════════════════════════════════════════
 
-def evaluate_truthfulqa_live(
-    pipeline: VeriFactPipeline, max_samples: int | None = None
-) -> dict:
+
+def evaluate_truthfulqa_live(pipeline: VeriFactPipeline, max_samples: int | None = None) -> dict:
     """
     Stress test: ask LLM questions from TruthfulQA, then verify answers.
 
@@ -181,8 +175,8 @@ def evaluate_truthfulqa_live(
         ds = ds.select(range(min(max_samples, len(ds))))
     print(f"Samples: {len(ds)}")
 
-    factuality_scores: List[float] = []
-    latencies: List[float] = []
+    factuality_scores: list[float] = []
+    latencies: list[float] = []
     total_s = total_c = total_u = total_ne = 0
 
     for item in tqdm(ds, desc="TruthfulQA-live"):
@@ -222,7 +216,10 @@ def evaluate_truthfulqa_live(
             factuality_scores, str(RESULTS_DIR / "truthfulqa_live_distribution.png")
         )
         plot_verdict_breakdown(
-            total_s, total_c, total_u, total_ne,
+            total_s,
+            total_c,
+            total_u,
+            total_ne,
             str(RESULTS_DIR / "truthfulqa_live_verdicts.png"),
         )
 
@@ -232,6 +229,7 @@ def evaluate_truthfulqa_live(
 # ═══════════════════════════════════════════════════════════════════════
 # CORE BENCHMARK: HaluEval Fixed-Response
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def evaluate_halueval(
     pipeline: VeriFactPipeline,
@@ -254,10 +252,10 @@ def evaluate_halueval(
     hal_threshold = threshold or pipeline.config.confidence.hallucination_threshold
     print(f"Samples: {len(ds)}, Threshold: {hal_threshold}")
 
-    y_true: List[int] = []
-    y_pred: List[int] = []
-    y_scores: List[float] = []
-    latencies: List[float] = []
+    y_true: list[int] = []
+    y_pred: list[int] = []
+    y_scores: list[float] = []
+    latencies: list[float] = []
 
     for item in tqdm(ds, desc="HaluEval"):
         # HaluEval schema: answer + hallucination ("yes"/"no") + knowledge
@@ -304,16 +302,17 @@ def evaluate_halueval(
 # Quick sanity check
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def quick_sanity_check(pipeline: VeriFactPipeline) -> dict:
     """Smoke test with hand-crafted inputs. No LLM generation needed."""
     print("\n=== Quick Sanity Check ===")
     test_cases = [
-        {"text": "The Eiffel Tower is located in Paris, France. It was built in 1889.",
-         "expected": "SUPPORTED"},
-        {"text": "Albert Einstein invented the telephone in 1920.",
-         "expected": "CONTRADICTED"},
-        {"text": "Water boils at 100 degrees Celsius at sea level.",
-         "expected": "SUPPORTED"},
+        {
+            "text": "The Eiffel Tower is located in Paris, France. It was built in 1889.",
+            "expected": "SUPPORTED",
+        },
+        {"text": "Albert Einstein invented the telephone in 1920.", "expected": "CONTRADICTED"},
+        {"text": "Water boils at 100 degrees Celsius at sea level.", "expected": "SUPPORTED"},
     ]
 
     results = []
@@ -321,13 +320,15 @@ def quick_sanity_check(pipeline: VeriFactPipeline) -> dict:
         try:
             result = pipeline.verify_text(tc["text"])
             verdicts = [c.verdict for c in result.claims]
-            results.append({
-                "text": tc["text"],
-                "expected": tc["expected"],
-                "factuality_score": result.factuality_score,
-                "verdicts": verdicts,
-                "time": result.processing_time,
-            })
+            results.append(
+                {
+                    "text": tc["text"],
+                    "expected": tc["expected"],
+                    "factuality_score": result.factuality_score,
+                    "verdicts": verdicts,
+                    "time": result.processing_time,
+                }
+            )
             print(f"  Score={result.factuality_score:.0f}  {verdicts}  [{tc['text'][:50]}…]")
         except Exception as exc:
             results.append({"text": tc["text"], "error": str(exc)})
@@ -340,6 +341,7 @@ def quick_sanity_check(pipeline: VeriFactPipeline) -> dict:
 # Main
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="VeriFactAI Evaluation Suite")
     parser.add_argument(
@@ -349,7 +351,9 @@ def main() -> None:
     )
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument(
-        "--profile", choices=["interactive", "eval"], default="eval",
+        "--profile",
+        choices=["interactive", "eval"],
+        default="eval",
         help="Performance profile (eval recommended for benchmarks)",
     )
     args = parser.parse_args()

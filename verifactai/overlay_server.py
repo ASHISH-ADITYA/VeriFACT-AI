@@ -252,9 +252,9 @@ class OverlayHandler(BaseHTTPRequestHandler):
             content_length = int(self.headers.get("Content-Length", "0"))
 
             # Request size limit: 100KB max
-            MAX_BODY = 100_000
-            if content_length > MAX_BODY:
-                self._json_response(413, {"error": f"Request too large (max {MAX_BODY} bytes)"})
+            max_body = 100_000
+            if content_length > max_body:
+                self._json_response(413, {"error": f"Request too large (max {max_body} bytes)"})
                 return
 
             raw = self.rfile.read(content_length)
@@ -266,9 +266,9 @@ class OverlayHandler(BaseHTTPRequestHandler):
                 return
 
             # Text length limit: 50,000 chars
-            MAX_TEXT = 50_000
-            if len(text) > MAX_TEXT:
-                self._json_response(400, {"error": f"Text too long (max {MAX_TEXT} chars)"})
+            max_text = 50_000
+            if len(text) > max_text:
+                self._json_response(400, {"error": f"Text too long (max {max_text} chars)"})
                 return
 
             top_claims = min(int(payload.get("top_claims", 6)), 20)  # Cap at 20
@@ -286,8 +286,8 @@ def run(host: str = "127.0.0.1", port: int = 8765) -> None:
 
     server = ThreadingHTTPServer((host, port), OverlayHandler)
     print(f"VeriFact overlay server listening on http://{host}:{port}")
-    print(f"  Security: origin whitelist, request size limit 100KB, text limit 50K chars")
-    print(f"  Press Ctrl+C to stop")
+    print("  Security: origin whitelist, request size limit 100KB, text limit 50K chars")
+    print("  Press Ctrl+C to stop")
 
     def _shutdown(signum, frame):
         print("\nShutting down gracefully...")

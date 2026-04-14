@@ -66,7 +66,7 @@ def open_native_window() -> None:
         notify("Dashboard opened in browser (native webview unavailable).")
         return
 
-    window = webview.create_window(
+    webview.create_window(
         "VeriFact AI",
         DASH_URL,
         width=1360,
@@ -103,7 +103,9 @@ def main() -> int:
     )
 
     if not overlay_ok or not dash_ok:
-        notify("Startup issue. Check /tmp/verifact_overlay.err.log and /tmp/verifact_dashboard.err.log")
+        notify(
+            "Startup issue. Check /tmp/verifact_overlay.err.log and /tmp/verifact_dashboard.err.log"
+        )
         return 1
 
     open_native_window()

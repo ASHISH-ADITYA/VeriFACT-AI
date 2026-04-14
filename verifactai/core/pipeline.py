@@ -15,32 +15,34 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 from config import Config, Profile
-from core.llm_client import LLMClient
-from core.claim_decomposer import ClaimDecomposer, Claim
-from core.evidence_retriever import EvidenceRetriever
-from core.verdict_engine import VerdictEngine
 from core.annotator import AnnotatedOutputGenerator
+from core.claim_decomposer import ClaimDecomposer
+from core.evidence_retriever import EvidenceRetriever
+from core.llm_client import LLMClient
+from core.selfcheck import SelfCheckScorer
+from core.verdict_engine import VerdictEngine
 from utils.helpers import logger, md5_hash, timed
 
 
 @dataclass
 class VerificationResult:
     """Complete output of a verification run."""
+
     original_text: str
-    llm_query: Optional[str]          # the question that produced this text (if any)
-    claims: list                       # List[Claim]
+    llm_query: str | None  # the question that produced this text (if any)
+    claims: list  # List[Claim]
     annotated_html: str
-    report_json: Dict[str, Any]
-    factuality_score: float            # 0–100
+    report_json: dict[str, Any]
+    factuality_score: float  # 0–100
     total_claims: int
     supported: int
     contradicted: int
     unverifiable: int
     no_evidence: int
-    processing_time: float             # seconds
+    processing_time: float  # seconds
 
 
 class VeriFactPipeline:
@@ -59,7 +61,12 @@ class VeriFactPipeline:
         self.decomposer = ClaimDecomposer(self.llm)
         self.retriever = EvidenceRetriever(self.config)
         self.verdict_engine = VerdictEngine(self.config)
-        self.annotator = AnnotatedOutputGenerator(llm=self.llm)
+        self.selfcheck = SelfCheckScorer(self.llm, self.config)
+        self.annotator = AnnotatedOutputGenerator(
+            llm=self.llm,
+            reflexion_enabled=self.config.reflexion.enabled,
+            reflexion_rounds=self.config.reflexion.max_rounds,
+        )
 
         self._cache: dict[str, VerificationResult] = {}
         logger.info("VeriFactPipeline ready")
@@ -82,7 +89,7 @@ class VeriFactPipeline:
         # Stage 2 — Evidence Retrieval (batch)
         claim_texts = [c.text for c in claims]
         evidence_batches = self.retriever.batch_retrieve(claim_texts)
-        for claim, evidence in zip(claims, evidence_batches):
+        for claim, evidence in zip(claims, evidence_batches, strict=False):
             claim.evidence = evidence
         logger.info("Stage 2 complete: evidence retrieved")
 
@@ -96,6 +103,31 @@ class VeriFactPipeline:
             claim.best_evidence = verdict.best_evidence
             claim.nli_scores = verdict.nli_scores
             claim.all_nli_results = verdict.all_nli
+
+            selfcheck = self.selfcheck.score_claim(claim.text, claim.evidence)
+            if selfcheck:
+                blend = min(max(self.config.selfcheck.confidence_blend_weight, 0.0), 1.0)
+                claim.confidence = round(
+                    (1.0 - blend) * float(claim.confidence) + blend * float(selfcheck["consistency"]),
+                    4,
+                )
+                claim.uncertainty = round(
+                    (float(claim.uncertainty) + float(selfcheck["uncertainty"])) / 2.0,
+                    4,
+                )
+                claim.stability = round(1.0 - float(claim.uncertainty), 4)
+                if claim.nli_scores is None:
+                    claim.nli_scores = {}
+                claim.nli_scores.update(
+                    {
+                        "selfcheck_consistency": selfcheck["consistency"],
+                        "selfcheck_entropy": selfcheck["entropy"],
+                        "selfcheck_disagreement": selfcheck["disagreement"],
+                        "selfcheck_distribution": selfcheck["distribution"],
+                        "selfcheck_majority_label": selfcheck["majority_label"],
+                        "selfcheck_valid_samples": selfcheck["valid_samples"],
+                    }
+                )
         logger.info("Stage 3 complete: verdicts assigned")
 
         # Stage 4 — Corrections for contradicted claims

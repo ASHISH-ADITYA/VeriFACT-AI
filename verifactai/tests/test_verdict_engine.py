@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-from core.verdict_engine import VerdictEngine, Verdict, NLIResult
-from core.evidence_retriever import Evidence
+from unittest.mock import patch
+
 from core.claim_decomposer import Claim
+from core.evidence_retriever import Evidence
+from core.verdict_engine import NLIResult, VerdictEngine
 
 
 class TestVerdictLogic:
@@ -15,14 +16,15 @@ class TestVerdictLogic:
         return NLIResult(evidence=evidence, entailment=ent, neutral=neu, contradiction=con)
 
     def _make_evidence(self, sim: float, source: str = "wikipedia") -> Evidence:
-        return Evidence(text="Test evidence", source=source, title="Test",
-                       url="", similarity=sim, chunk_id=0)
+        return Evidence(
+            text="Test evidence", source=source, title="Test", url="", similarity=sim, chunk_id=0
+        )
 
     def test_no_evidence_returns_no_evidence(self):
         """Empty evidence list should produce NO_EVIDENCE verdict."""
         claim = Claim(id="c-0", text="test", source_sentence="test")
         # We need a VerdictEngine instance but avoid loading the real model
-        with patch.object(VerdictEngine, '__init__', lambda self, config: None):
+        with patch.object(VerdictEngine, "__init__", lambda self, config: None):
             engine = VerdictEngine.__new__(VerdictEngine)
             verdict = engine.judge(claim, [])
             assert verdict.label == "NO_EVIDENCE"
@@ -38,8 +40,14 @@ class TestVerdictLogic:
 
     def test_claim_with_all_fields(self):
         ev = self._make_evidence(0.8)
-        c = Claim(id="c-1", text="fact", source_sentence="fact",
-                  claim_type="numerical", char_start=10, char_end=20)
+        c = Claim(
+            id="c-1",
+            text="fact",
+            source_sentence="fact",
+            claim_type="numerical",
+            char_start=10,
+            char_end=20,
+        )
         c.evidence = [ev]
         c.verdict = "SUPPORTED"
         c.confidence = 0.95
@@ -74,13 +82,18 @@ class TestEvidenceDataModel:
     """Test Evidence dataclass."""
 
     def test_evidence_fields(self):
-        ev = Evidence(text="test", source="wikipedia", title="Test Article",
-                     url="https://example.com", similarity=0.85, chunk_id=42)
+        ev = Evidence(
+            text="test",
+            source="wikipedia",
+            title="Test Article",
+            url="https://example.com",
+            similarity=0.85,
+            chunk_id=42,
+        )
         assert ev.source == "wikipedia"
         assert ev.similarity == 0.85
         assert ev.chunk_id == 42
 
     def test_evidence_low_similarity(self):
-        ev = Evidence(text="", source="unknown", title="", url="",
-                     similarity=0.1, chunk_id=0)
+        ev = Evidence(text="", source="unknown", title="", url="", similarity=0.1, chunk_id=0)
         assert ev.similarity < 0.3  # Below relevance threshold

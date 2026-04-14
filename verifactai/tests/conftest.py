@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from dataclasses import dataclass
-from typing import List
 from unittest.mock import MagicMock
 
 import pytest
@@ -20,12 +18,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from core.claim_decomposer import Claim
 from core.evidence_retriever import Evidence
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────
 
 
 @pytest.fixture
-def sample_claims() -> List[Claim]:
+def sample_claims() -> list[Claim]:
     """Three claims with diverse types for testing."""
     return [
         Claim(
@@ -56,7 +53,7 @@ def sample_claims() -> List[Claim]:
 
 
 @pytest.fixture
-def sample_evidence() -> List[Evidence]:
+def sample_evidence() -> list[Evidence]:
     """Evidence passages for testing verdict engine."""
     return [
         Evidence(

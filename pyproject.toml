@@ -86,6 +86,7 @@ select = [
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
+    "E402",   # import not at top — intentional for runtime_safety bootstrap
     "B008",   # do not perform function call in argument defaults
     "SIM108", # ternary operator suggestion
 ]

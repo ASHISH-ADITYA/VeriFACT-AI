@@ -12,8 +12,6 @@ Provides:
 
 from __future__ import annotations
 
-from typing import List
-
 import numpy as np
 from sklearn.metrics import (
     accuracy_score,
@@ -28,7 +26,7 @@ from sklearn.metrics import (
 
 
 def binary_hallucination_metrics(
-    y_true: List[int], y_pred: List[int], y_scores: List[float] | None = None
+    y_true: list[int], y_pred: list[int], y_scores: list[float] | None = None
 ) -> dict:
     """
     Binary hallucination detection metrics.
@@ -63,8 +61,8 @@ def binary_hallucination_metrics(
 
 
 def expected_calibration_error(
-    confidences: List[float],
-    accuracies: List[int],
+    confidences: list[float],
+    accuracies: list[int],
     n_bins: int = 10,
 ) -> float:
     """
@@ -91,7 +89,7 @@ def expected_calibration_error(
     return float(ece)
 
 
-def latency_percentiles(latencies: List[float]) -> dict:
+def latency_percentiles(latencies: list[float]) -> dict:
     """Compute p50 and p95 latency from a list of processing times (seconds)."""
     if not latencies:
         return {"p50": 0.0, "p95": 0.0, "mean": 0.0}
@@ -104,7 +102,7 @@ def latency_percentiles(latencies: List[float]) -> dict:
 
 
 def retrieval_recall_at_k(
-    relevant_found: List[bool],
+    relevant_found: list[bool],
 ) -> float:
     """
     Fraction of claims where at least one relevant evidence passage was retrieved.
@@ -118,9 +116,7 @@ def retrieval_recall_at_k(
     return float(sum(relevant_found) / len(relevant_found))
 
 
-def verdict_accuracy(
-    predicted_verdicts: List[str], ground_truth_verdicts: List[str]
-) -> dict:
+def verdict_accuracy(predicted_verdicts: list[str], ground_truth_verdicts: list[str]) -> dict:
     """Multi-class verdict accuracy."""
     label_map = {"SUPPORTED": 0, "CONTRADICTED": 1, "UNVERIFIABLE": 2, "NO_EVIDENCE": 2}
     y_true = [label_map.get(v, 2) for v in ground_truth_verdicts]
@@ -129,7 +125,8 @@ def verdict_accuracy(
     return {
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "report": classification_report(
-            y_true, y_pred,
+            y_true,
+            y_pred,
             target_names=["SUPPORTED", "CONTRADICTED", "UNVERIFIABLE"],
             output_dict=True,
             zero_division=0,

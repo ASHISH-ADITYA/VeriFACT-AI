@@ -42,6 +42,7 @@ def check_python_version() -> str:
 def check_spacy_model() -> str:
     try:
         import spacy
+
         spacy.load("en_core_web_sm")
         print(f"  spaCy en_core_web_sm: {PASS}")
         return PASS
@@ -64,20 +65,25 @@ def check_ollama() -> str:
 
 def check_faiss_index() -> str:
     from config import cfg
+
     p = Path(cfg.retrieval.index_path)
     if p.exists():
         mb = p.stat().st_size / (1024 * 1024)
         print(f"  FAISS index: {PASS} ({mb:.0f} MB at {p})")
         return PASS
     else:
-        print(f"  FAISS index: {FAIL} — run: python data/build_index.py --wiki-only --max-articles 5000")
+        print(
+            f"  FAISS index: {FAIL} — run: python data/build_index.py --wiki-only --max-articles 5000"
+        )
         return FAIL
 
 
 def check_nli_model() -> str:
     try:
         from transformers import AutoTokenizer
+
         from config import cfg
+
         AutoTokenizer.from_pretrained(cfg.nli.model_name)
         print(f"  NLI model ({cfg.nli.model_name}): {PASS}")
         return PASS
@@ -89,7 +95,9 @@ def check_nli_model() -> str:
 def check_embedding_model() -> str:
     try:
         from sentence_transformers import SentenceTransformer
+
         from config import cfg
+
         SentenceTransformer(cfg.embedding.model_name)
         print(f"  Embedding model ({cfg.embedding.model_name}): {PASS}")
         return PASS

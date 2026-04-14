@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from config import Config, Profile, PROFILES, PerformanceProfile
+from config import PROFILES, Config, Profile
 
 
 class TestConfig:

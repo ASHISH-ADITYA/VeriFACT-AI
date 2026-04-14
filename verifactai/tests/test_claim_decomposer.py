@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+
 from core.claim_decomposer import ClaimDecomposer
 
 
@@ -48,13 +49,21 @@ class TestSentenceFiltering:
         assert ClaimDecomposer._should_skip("This might possibly be true in some cases.") is True
 
     def test_skip_hedge_perhaps(self):
-        assert ClaimDecomposer._should_skip("Perhaps this could be the answer to the question.") is True
+        assert (
+            ClaimDecomposer._should_skip("Perhaps this could be the answer to the question.")
+            is True
+        )
 
     def test_keep_factual(self):
         assert ClaimDecomposer._should_skip("Albert Einstein was born in Ulm in 1879.") is False
 
     def test_keep_long_factual(self):
-        assert ClaimDecomposer._should_skip("The speed of light in a vacuum is approximately 299,792 kilometers per second.") is False
+        assert (
+            ClaimDecomposer._should_skip(
+                "The speed of light in a vacuum is approximately 299,792 kilometers per second."
+            )
+            is False
+        )
 
 
 class TestSpanLocation:

@@ -18,12 +18,18 @@ class TestJsonReport:
         assert result["original_text"] == "Some text."
 
     def test_single_supported_claim(self):
-        claim = Claim(id="c-0", text="Paris is in France.", source_sentence="Paris is in France.",
-                     char_start=0, char_end=19)
+        claim = Claim(
+            id="c-0",
+            text="Paris is in France.",
+            source_sentence="Paris is in France.",
+            char_start=0,
+            char_end=19,
+        )
         claim.verdict = "SUPPORTED"
         claim.confidence = 0.9
-        claim.best_evidence = Evidence(text="ev", source="wikipedia", title="T",
-                                       url="", similarity=0.8, chunk_id=0)
+        claim.best_evidence = Evidence(
+            text="ev", source="wikipedia", title="T", url="", similarity=0.8, chunk_id=0
+        )
         claim.nli_scores = {"entailment": 0.9, "neutral": 0.05, "contradiction": 0.05}
 
         gen = AnnotatedOutputGenerator()
@@ -62,8 +68,7 @@ class TestHtmlAnnotation:
         assert "<script>" not in html  # No injection
 
     def test_supported_claim_gets_green(self):
-        claim = Claim(id="c-0", text="Fact.", source_sentence="Fact.",
-                     char_start=0, char_end=5)
+        claim = Claim(id="c-0", text="Fact.", source_sentence="Fact.", char_start=0, char_end=5)
         claim.verdict = "SUPPORTED"
         claim.confidence = 0.9
         claim.best_evidence = None
