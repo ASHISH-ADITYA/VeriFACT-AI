@@ -189,9 +189,7 @@ class ReflexionConfig(BaseModel):
 class ConstitutionalConfig(BaseModel):
     """Constitutional critique-and-revision controls for safe corrections."""
 
-    enabled: bool = Field(
-        default_factory=lambda: os.getenv("CONSTITUTIONAL_ENABLED", "1") == "1"
-    )
+    enabled: bool = Field(default_factory=lambda: os.getenv("CONSTITUTIONAL_ENABLED", "1") == "1")
     max_rounds: int = Field(
         default_factory=lambda: int(os.getenv("CONSTITUTIONAL_MAX_ROUNDS", "1"))
     )

@@ -7,9 +7,9 @@ uncertainty from multiple stochastic checks.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from math import log
-import re
 
 
 def normalized_entropy(labels: list[str], classes: list[str]) -> float:

@@ -126,9 +126,7 @@ class VeriFactPipeline:
                         "selfcheck_consistency": selfcheck["consistency"],
                         "selfcheck_entropy": selfcheck["entropy"],
                         "selfcheck_disagreement": selfcheck["disagreement"],
-                        "selfcheck_semantic_cluster_entropy": selfcheck[
-                            "semantic_cluster_entropy"
-                        ],
+                        "selfcheck_semantic_cluster_entropy": selfcheck["semantic_cluster_entropy"],
                         "selfcheck_distribution": selfcheck["distribution"],
                         "selfcheck_majority_label": selfcheck["majority_label"],
                         "selfcheck_valid_samples": selfcheck["valid_samples"],
