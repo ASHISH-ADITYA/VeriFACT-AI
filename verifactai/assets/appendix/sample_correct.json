@@ -1,0 +1,60 @@
+{
+  "original_text": "The Eiffel Tower is located in Paris, France. It was completed in 1889.",
+  "factuality_score": 50.0,
+  "total_claims": 2,
+  "supported": 1,
+  "contradicted": 1,
+  "unverifiable": 0,
+  "no_evidence": 0,
+  "claims": [
+    {
+      "id": "c-0",
+      "claim": "The Eiffel Tower is located in Paris, France.",
+      "verdict": "SUPPORTED",
+      "confidence": 0.9449,
+      "claim_type": "entity_fact",
+      "source_sentence": "The Eiffel Tower is located in Paris, France. It was completed in 1889.",
+      "span": {
+        "start": 0,
+        "end": 71
+      },
+      "evidence": {
+        "text": "The Eiffel Tower (French: La Tour Eiffel, [tu\u0281 \u025bf\u025bl], IPA pronunciation: \"EYE-full\" English; \"eh-FEHL\" French) is a landmark in Paris. It was built between 1887 and 1889 for the Exposition Universelle (World Fair). It was supposed to be a temporary installation for the 1889 World Fair, held at Paris to commemorate 100 years of the French Revolution. In 1909, there were discussions regarding the potential dismantling of the Eiffel Tower. However, the decision to preserve this iconic structure was ultimately reached by city officials, who acknowledged its significance as a radiotelegraphy station. Background The Eiffel Tower cost 7,799,401.31 French gold francs to build in 1889, an amount equal to $1,495,139.89 at that time. Today, its cost would equal to $36,784,020.11. It took 2 years, 2 months and 5 days to build it. The tower is tall, but this height does not include the aerial (antenna) on the top; the total height of the structure is . It has a square base that is long on each side. The second story platform is off , and the surface to be painted is . Since it has been built it has been repainted 18 times, each of these 18 paint jobs there",
+        "source": "wikipedia",
+        "title": "Eiffel Tower",
+        "url": "https://simple.wikipedia.org/wiki/Eiffel_Tower",
+        "similarity": 0.7813507914543152
+      },
+      "nli_scores": {
+        "entailment": 0.9991,
+        "neutral": -0.0006,
+        "contradiction": 0.0014
+      }
+    },
+    {
+      "id": "c-1",
+      "claim": "It was completed in 1889.",
+      "verdict": "CONTRADICTED",
+      "confidence": 0.6063,
+      "claim_type": "temporal",
+      "source_sentence": "The Eiffel Tower is located in Paris, France. It was completed in 1889.",
+      "span": {
+        "start": 0,
+        "end": 71
+      },
+      "evidence": {
+        "text": "through the Angel Moroni to the place where they were buried. 1857 Russian warship Lefort capsizes and sinks in the Gulf of Finland, killing all 806 people on board. 1862 A preliminary version of the Emancipation Proclamation is released. 1864 American Civil War: End of the Battle of Fishers Hill. 1869 Richard Wagner's opera Das Rheingold debuts in Munich. 1877 French astronomer Edouard Jean-Marie Stephan discovers five galaxies, that together are now known as the \"Stephan Quintet\". 1888 The first issue of National Geographic Magazine is published. 1893 The first American-built automobile, built by the Duryea Brothers, is displayed. 1896 Queen Victoria surpasses her grandfather, King George III, as the longest-reigning monarch in British history. Elizabeth II beats her record on September 9, 2015. 1901 2000 1908 Independence of Bulgaria recognised. 1910 The Duke of York's Picture House opens in Brighton, now the oldest continually operating cinema in the United Kingdom. 1914 German submarine 5M U-9 torpedoes and sinks British cruisers HMS Aboukir, HMS Hague and HMS Cressy on the Broad Fourteens off the Dutch coast with the loss of 1,400 men and boys. 1919 The Steel Strike of 1919 begins in Pennsylvania, later spreading across the United States. 1927",
+        "source": "wikipedia",
+        "title": "September 22",
+        "url": "https://simple.wikipedia.org/wiki/September_22",
+        "similarity": 0.39012593030929565
+      },
+      "correction": "The claim that a specific event was completed in 1889 is contradicted by evidence showing that it actually occurred in 1893, as indicated by the publication of the first American-built automobile by the Duryea Brothers on that year.",
+      "nli_scores": {
+        "entailment": 0.9988,
+        "neutral": -0.9977,
+        "contradiction": 0.9989
+      }
+    }
+  ]
+}

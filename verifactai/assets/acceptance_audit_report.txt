@@ -1,0 +1,18 @@
+VeriFact Acceptance Audit
+Generated: Tue Apr 14 03:06:28 IST 2026
+
+[PASS] Overlay server present
+[PASS] Desktop app present
+[PASS] Extension manifest present
+[PASS] Python modules compile
+[PASS] Gemini host support configured
+[PASS] ChatGPT + Claude host support configured
+[PASS] Beacon mid-right positioning configured
+[PASS] Overlay health endpoint reachable
+[PASS] Overlay analyze endpoint returns response
+[PASS] CAPSTONE_REPORT has no [N]/[M]/[V] placeholders
+[INFO] Index build process is not running
+[INFO] Index file: 541M Apr 14 01:40
+[INFO] Metadata lines:   369363
+
+Audit complete.

@@ -1,0 +1,28 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+23:04:53 | INFO     | Initialising VeriFactPipeline (profile=interactive, provider=ollama, model=llama3.1:8b)
+23:04:53 | INFO     | Ollama configured (model=llama3.1:8b, url=http://localhost:11434)
+23:04:53 | INFO     | ClaimDecomposer initialised
+23:04:53 | INFO     | Loading embedding model: sentence-transformers/all-MiniLM-L6-v2
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 18284.73it/s]
+[1mBertModel LOAD REPORT[0m from: sentence-transformers/all-MiniLM-L6-v2
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+23:05:02 | INFO     | Loading FAISS index from data/index/knowledge.index
+23:05:02 | INFO     | Index loaded — 24,605 vectors
+23:05:02 | INFO     | Loading metadata from data/metadata/chunks.jsonl
+23:05:02 | INFO     | Loaded 24,605 metadata entries
+23:05:02 | INFO     | Loading NLI model: cross-encoder/nli-deberta-v3-base
+Loading weights:   0%|          | 0/202 [00:00<?, ?it/s]Loading weights: 100%|██████████| 202/202 [00:00<00:00, 8813.21it/s]
+[1mDebertaV2ForSequenceClassification LOAD REPORT[0m from: cross-encoder/nli-deberta-v3-base
+Key                             | Status     |  | 
+--------------------------------+------------+--+-
+deberta.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+/opt/homebrew/Cellar/python@3.11/3.11.14_3/Frameworks/Python.framework/Versions/3.11/lib/python3.11/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

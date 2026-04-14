@@ -1,0 +1,36 @@
+{
+  "sanity": {
+    "benchmark": "sanity_check",
+    "results": [
+      {
+        "text": "The Eiffel Tower is located in Paris, France. It was built in 1889.",
+        "expected": "SUPPORTED",
+        "factuality_score": 50.0,
+        "verdicts": [
+          "SUPPORTED",
+          "CONTRADICTED"
+        ],
+        "time": 17.33
+      },
+      {
+        "text": "Albert Einstein invented the telephone in 1920.",
+        "expected": "CONTRADICTED",
+        "factuality_score": 0.0,
+        "verdicts": [
+          "CONTRADICTED"
+        ],
+        "time": 16.0
+      },
+      {
+        "text": "Water boils at 100 degrees Celsius at sea level.",
+        "expected": "SUPPORTED",
+        "factuality_score": 50.0,
+        "verdicts": [
+          "UNVERIFIABLE",
+          "SUPPORTED"
+        ],
+        "time": 7.78
+      }
+    ]
+  }
+}

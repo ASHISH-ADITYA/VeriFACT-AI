@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  verifact:
+    build: .
+    ports:
+      - "8501:8501"   # Streamlit dashboard
+      - "8765:8765"   # Overlay API for extension
+    environment:
+      - LLM_PROVIDER=ollama
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - LLM_MODEL=llama3.1:8b
+    volumes:
+      # Mount index if pre-built on host
+      - ./verifactai/data/index:/app/verifactai/data/index:ro
+      - ./verifactai/data/metadata:/app/verifactai/data/metadata:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

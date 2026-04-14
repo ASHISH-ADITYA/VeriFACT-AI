@@ -1,0 +1,47 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+============================================================
+VeriFactAI Smoke Test
+============================================================
+
+[1/3] Prerequisites:
+  Python version: 3.11.14 — PASS
+  spaCy en_core_web_sm: PASS
+  Ollama running: PASS — models: ['qwen2.5:3b-instruct', 'llama3.1:8b']
+  FAISS index: PASS (36 MB at data/index/knowledge.index)
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 6011.79it/s]
+[1mBertModel LOAD REPORT[0m from: sentence-transformers/all-MiniLM-L6-v2
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+  Embedding model (sentence-transformers/all-MiniLM-L6-v2): PASS
+  NLI model (cross-encoder/nli-deberta-v3-base): PASS
+
+[2/3] Component tests:
+23:04:30 | INFO     | ClaimDecomposer initialised
+23:04:30 | WARNING  | LLM decomposition failed (Intentional: testing spaCy fallback); falling back to spaCy
+23:04:30 | INFO     | Fallback decomposed text into 2 claims
+23:04:30 | INFO     | ClaimDecomposer.decompose completed in 0.013s
+  Claim decomposition (spaCy fallback): PASS — 2 claims extracted
+23:04:30 | INFO     | Loading embedding model: sentence-transformers/all-MiniLM-L6-v2
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 13328.40it/s]
+[1mBertModel LOAD REPORT[0m from: sentence-transformers/all-MiniLM-L6-v2
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+23:04:38 | INFO     | Loading FAISS index from data/index/knowledge.index
+23:04:38 | INFO     | Index loaded — 24,605 vectors
+23:04:38 | INFO     | Loading metadata from data/metadata/chunks.jsonl
+23:04:38 | INFO     | Loaded 24,605 metadata entries
+23:04:38 | INFO     | EvidenceRetriever.retrieve completed in 0.210s
+  Retrieval test: PASS — 3 evidence passages found
+
+[3/3] Summary:
+  8 passed, 0 warnings, 0 failures
+
+  VERDICT: READY for demo

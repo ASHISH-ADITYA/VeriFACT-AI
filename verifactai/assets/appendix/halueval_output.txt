@@ -1,0 +1,192 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+02:42:16 | INFO     | Initialising VeriFactPipeline (profile=interactive, provider=ollama, model=llama3.1:8b)
+02:42:16 | INFO     | Ollama configured (model=llama3.1:8b, url=http://localhost:11434)
+02:42:17 | INFO     | ClaimDecomposer initialised
+02:42:17 | INFO     | Loading embedding model: sentence-transformers/all-MiniLM-L6-v2
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 6244.41it/s]
+[1mBertModel LOAD REPORT[0m from: sentence-transformers/all-MiniLM-L6-v2
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+02:42:27 | INFO     | Loading FAISS index from data/index/knowledge.index
+02:42:28 | INFO     | Index loaded — 369,363 vectors
+02:42:28 | INFO     | Loading metadata from data/metadata/chunks.jsonl
+02:42:29 | INFO     | Loaded 369,363 metadata entries
+02:42:29 | INFO     | Loading NLI model: cross-encoder/nli-deberta-v3-base
+Loading weights:   0%|          | 0/202 [00:00<?, ?it/s]Loading weights: 100%|██████████| 202/202 [00:00<00:00, 6329.09it/s]
+[1mDebertaV2ForSequenceClassification LOAD REPORT[0m from: cross-encoder/nli-deberta-v3-base
+Key                             | Status     |  | 
+--------------------------------+------------+--+-
+deberta.embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+02:42:32 | INFO     | NLI model using Apple MPS acceleration
+02:42:33 | INFO     | VerdictEngine ready
+02:42:33 | INFO     | VeriFactPipeline ready
+
+=== [CORE] HaluEval Fixed-Response Evaluation ===
+Samples: 30, Threshold: 0.5
+HaluEval:   0%|          | 0/30 [00:00<?, ?it/s]HaluEval:   3%|▎         | 1/30 [00:09<04:37,  9.55s/it]HaluEval:  10%|█         | 3/30 [00:12<01:40,  3.71s/it]HaluEval:  17%|█▋        | 5/30 [00:13<00:49,  1.99s/it]HaluEval:  20%|██        | 6/30 [00:16<00:56,  2.35s/it]HaluEval:  23%|██▎       | 7/30 [00:24<01:25,  3.72s/it]HaluEval:  40%|████      | 12/30 [00:34<00:47,  2.62s/it]HaluEval:  50%|█████     | 15/30 [00:44<00:43,  2.89s/it]HaluEval:  53%|█████▎    | 16/30 [00:56<00:58,  4.16s/it]HaluEval:  57%|█████▋    | 17/30 [01:05<01:05,  5.03s/it]HaluEval:  60%|██████    | 18/30 [01:18<01:18,  6.57s/it]HaluEval:  63%|██████▎   | 19/30 [01:27<01:19,  7.22s/it]HaluEval:  70%|███████   | 21/30 [01:38<00:59,  6.62s/it]HaluEval:  73%|███████▎  | 22/30 [01:57<01:13,  9.14s/it]HaluEval:  83%|████████▎ | 25/30 [02:10<00:34,  6.83s/it]HaluEval:  97%|█████████▋| 29/30 [02:30<00:05,  5.96s/it]HaluEval: 100%|██████████| 30/30 [03:01<00:00,  9.64s/it]HaluEval: 100%|██████████| 30/30 [03:01<00:00,  6.05s/it]
+02:42:46 | INFO     | LLM decomposed text into 1 claims
+02:42:46 | INFO     | ClaimDecomposer.decompose completed in 8.618s
+02:42:46 | INFO     | Stage 1 complete: 1 claims extracted
+02:42:46 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.476s
+02:42:46 | INFO     | Stage 2 complete: evidence retrieved
+02:42:47 | INFO     | VerdictEngine.judge completed in 0.458s
+02:42:47 | INFO     | Stage 3 complete: verdicts assigned
+02:42:47 | INFO     | Stage 4–5 complete: output annotated
+02:42:47 | INFO     | VeriFactPipeline.verify_text completed in 9.554s
+02:42:49 | INFO     | LLM decomposed text into 1 claims
+02:42:49 | INFO     | ClaimDecomposer.decompose completed in 2.735s
+02:42:49 | INFO     | Stage 1 complete: 1 claims extracted
+02:42:50 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.182s
+02:42:50 | INFO     | Stage 2 complete: evidence retrieved
+02:42:50 | INFO     | VerdictEngine.judge completed in 0.406s
+02:42:50 | INFO     | Stage 3 complete: verdicts assigned
+02:42:50 | INFO     | Stage 4–5 complete: output annotated
+02:42:50 | INFO     | VeriFactPipeline.verify_text completed in 3.326s
+02:42:50 | INFO     | Fallback decomposed text into 1 claims
+02:42:50 | INFO     | ClaimDecomposer.decompose completed in 0.362s
+02:42:50 | INFO     | Stage 1 complete: 1 claims extracted
+02:42:50 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.099s
+02:42:50 | INFO     | Stage 2 complete: evidence retrieved
+02:42:51 | INFO     | VerdictEngine.judge completed in 0.280s
+02:42:51 | INFO     | Stage 3 complete: verdicts assigned
+02:42:51 | INFO     | Stage 4–5 complete: output annotated
+02:42:51 | INFO     | VeriFactPipeline.verify_text completed in 0.742s
+02:42:53 | INFO     | LLM decomposed text into 1 claims
+02:42:53 | INFO     | ClaimDecomposer.decompose completed in 2.771s
+02:42:53 | INFO     | Stage 1 complete: 1 claims extracted
+02:42:54 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.121s
+02:42:54 | INFO     | Stage 2 complete: evidence retrieved
+02:42:54 | INFO     | VerdictEngine.judge completed in 0.415s
+02:42:54 | INFO     | Stage 3 complete: verdicts assigned
+02:42:54 | INFO     | Stage 4–5 complete: output annotated
+02:42:54 | INFO     | VeriFactPipeline.verify_text completed in 3.308s
+02:43:00 | INFO     | LLM decomposed text into 2 claims
+02:43:00 | INFO     | ClaimDecomposer.decompose completed in 6.147s
+02:43:00 | INFO     | Stage 1 complete: 2 claims extracted
+02:43:00 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.234s
+02:43:00 | INFO     | Stage 2 complete: evidence retrieved
+02:43:01 | INFO     | VerdictEngine.judge completed in 0.258s
+02:43:01 | INFO     | VerdictEngine.judge completed in 0.671s
+02:43:01 | INFO     | Stage 3 complete: verdicts assigned
+02:43:01 | INFO     | Stage 4–5 complete: output annotated
+02:43:01 | INFO     | VeriFactPipeline.verify_text completed in 7.311s
+02:43:08 | INFO     | LLM decomposed text into 2 claims
+02:43:08 | INFO     | ClaimDecomposer.decompose completed in 6.362s
+02:43:08 | INFO     | Stage 1 complete: 2 claims extracted
+02:43:08 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.184s
+02:43:08 | INFO     | Stage 2 complete: evidence retrieved
+02:43:08 | INFO     | VerdictEngine.judge completed in 0.273s
+02:43:08 | INFO     | VerdictEngine.judge completed in 0.280s
+02:43:08 | INFO     | Stage 3 complete: verdicts assigned
+02:43:12 | INFO     | Stage 4–5 complete: output annotated
+02:43:12 | INFO     | VeriFactPipeline.verify_text completed in 10.280s
+02:43:21 | INFO     | LLM decomposed text into 2 claims
+02:43:21 | INFO     | ClaimDecomposer.decompose completed in 8.935s
+02:43:21 | INFO     | Stage 1 complete: 2 claims extracted
+02:43:21 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.397s
+02:43:21 | INFO     | Stage 2 complete: evidence retrieved
+02:43:21 | INFO     | VerdictEngine.judge completed in 0.444s
+02:43:22 | INFO     | VerdictEngine.judge completed in 0.317s
+02:43:22 | INFO     | Stage 3 complete: verdicts assigned
+02:43:22 | INFO     | Stage 4–5 complete: output annotated
+02:43:22 | INFO     | VeriFactPipeline.verify_text completed in 10.096s
+02:43:27 | INFO     | LLM decomposed text into 2 claims
+02:43:27 | INFO     | ClaimDecomposer.decompose completed in 5.479s
+02:43:27 | INFO     | Stage 1 complete: 2 claims extracted
+02:43:28 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.401s
+02:43:28 | INFO     | Stage 2 complete: evidence retrieved
+02:43:28 | INFO     | VerdictEngine.judge completed in 0.312s
+02:43:28 | INFO     | VerdictEngine.judge completed in 0.380s
+02:43:28 | INFO     | Stage 3 complete: verdicts assigned
+02:43:33 | INFO     | Stage 4–5 complete: output annotated
+02:43:33 | INFO     | VeriFactPipeline.verify_text completed in 11.488s
+02:43:42 | INFO     | LLM decomposed text into 2 claims
+02:43:42 | INFO     | ClaimDecomposer.decompose completed in 8.423s
+02:43:42 | INFO     | Stage 1 complete: 2 claims extracted
+02:43:42 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.161s
+02:43:42 | INFO     | Stage 2 complete: evidence retrieved
+02:43:42 | INFO     | VerdictEngine.judge completed in 0.451s
+02:43:42 | INFO     | VerdictEngine.judge completed in 0.144s
+02:43:42 | INFO     | Stage 3 complete: verdicts assigned
+02:43:42 | INFO     | Stage 4–5 complete: output annotated
+02:43:42 | INFO     | VeriFactPipeline.verify_text completed in 9.182s
+02:43:50 | INFO     | LLM decomposed text into 2 claims
+02:43:50 | INFO     | ClaimDecomposer.decompose completed in 7.468s
+02:43:50 | INFO     | Stage 1 complete: 2 claims extracted
+02:43:50 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.247s
+02:43:50 | INFO     | Stage 2 complete: evidence retrieved
+02:43:51 | INFO     | VerdictEngine.judge completed in 0.436s
+02:43:51 | INFO     | VerdictEngine.judge completed in 0.333s
+02:43:51 | INFO     | Stage 3 complete: verdicts assigned
+02:43:55 | INFO     | Stage 4–5 complete: output annotated
+02:43:55 | INFO     | VeriFactPipeline.verify_text completed in 12.795s
+02:44:01 | INFO     | LLM decomposed text into 1 claims
+02:44:01 | INFO     | ClaimDecomposer.decompose completed in 5.379s
+02:44:01 | INFO     | Stage 1 complete: 1 claims extracted
+02:44:01 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.158s
+02:44:01 | INFO     | Stage 2 complete: evidence retrieved
+02:44:01 | INFO     | VerdictEngine.judge completed in 0.370s
+02:44:01 | INFO     | Stage 3 complete: verdicts assigned
+02:44:05 | INFO     | Stage 4–5 complete: output annotated
+02:44:05 | INFO     | VeriFactPipeline.verify_text completed in 9.473s
+02:44:15 | INFO     | LLM decomposed text into 2 claims
+02:44:15 | INFO     | ClaimDecomposer.decompose completed in 10.199s
+02:44:15 | INFO     | Stage 1 complete: 2 claims extracted
+02:44:15 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.082s
+02:44:15 | INFO     | Stage 2 complete: evidence retrieved
+02:44:15 | INFO     | VerdictEngine.judge completed in 0.536s
+02:44:16 | INFO     | VerdictEngine.judge completed in 0.532s
+02:44:16 | INFO     | Stage 3 complete: verdicts assigned
+02:44:16 | INFO     | Stage 4–5 complete: output annotated
+02:44:16 | INFO     | VeriFactPipeline.verify_text completed in 11.354s
+02:44:23 | INFO     | LLM decomposed text into 2 claims
+02:44:23 | INFO     | ClaimDecomposer.decompose completed in 7.388s
+02:44:23 | INFO     | Stage 1 complete: 2 claims extracted
+02:44:24 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.188s
+02:44:24 | INFO     | Stage 2 complete: evidence retrieved
+02:44:24 | INFO     | VerdictEngine.judge completed in 0.809s
+02:44:25 | INFO     | VerdictEngine.judge completed in 0.422s
+02:44:25 | INFO     | Stage 3 complete: verdicts assigned
+02:44:34 | INFO     | Stage 4–5 complete: output annotated
+02:44:34 | INFO     | VeriFactPipeline.verify_text completed in 18.245s
+02:44:46 | INFO     | LLM decomposed text into 2 claims
+02:44:46 | INFO     | ClaimDecomposer.decompose completed in 12.004s
+02:44:46 | INFO     | Stage 1 complete: 2 claims extracted
+02:44:46 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.100s
+02:44:46 | INFO     | Stage 2 complete: evidence retrieved
+02:44:47 | INFO     | VerdictEngine.judge completed in 0.414s
+02:44:47 | INFO     | VerdictEngine.judge completed in 0.493s
+02:44:47 | INFO     | Stage 3 complete: verdicts assigned
+02:44:47 | INFO     | Stage 4–5 complete: output annotated
+02:44:47 | INFO     | VeriFactPipeline.verify_text completed in 13.014s
+02:44:59 | INFO     | LLM decomposed text into 2 claims
+02:44:59 | INFO     | ClaimDecomposer.decompose completed in 11.333s
+02:44:59 | INFO     | Stage 1 complete: 2 claims extracted
+02:44:59 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.427s
+02:44:59 | INFO     | Stage 2 complete: evidence retrieved
+02:45:00 | INFO     | VerdictEngine.judge completed in 1.011s
+02:45:01 | INFO     | VerdictEngine.judge completed in 0.555s
+02:45:01 | INFO     | Stage 3 complete: verdicts assigned
+02:45:07 | INFO     | Stage 4–5 complete: output annotated
+02:45:07 | INFO     | VeriFactPipeline.verify_text completed in 20.035s
+02:45:23 | INFO     | LLM decomposed text into 2 claims
+02:45:23 | INFO     | ClaimDecomposer.decompose completed in 15.378s
+02:45:23 | INFO     | Stage 1 complete: 2 claims extracted
+02:45:23 | INFO     | EvidenceRetriever.batch_retrieve completed in 0.366s
+02:45:23 | INFO     | Stage 2 complete: evidence retrieved
+02:45:23 | INFO     | VerdictEngine.judge completed in 0.370s
+02:45:24 | INFO     | VerdictEngine.judge completed in 0.507s
+02:45:24 | INFO     | Stage 3 complete: verdicts assigned
+02:45:39 | INFO     | Stage 4–5 complete: output annotated
+02:45:39 | INFO     | VeriFactPipeline.verify_text completed in 31.220s
+  Saved → assets/evaluation/halueval_cm.png
+  Saved → assets/evaluation/halueval_roc.png
+
+All metrics saved to assets/evaluation/evaluation_results.json

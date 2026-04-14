@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.verifact.desktop</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/adityaashish/Desktop/ENGINEERING_PROJECT_II/venv/bin/python</string>
+    <string>/Users/adityaashish/Desktop/ENGINEERING_PROJECT_II/verifactai/desktop/verifact_desktop.py</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/verifact_desktop.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/verifact_desktop.err.log</string>
+</dict>
+</plist>
