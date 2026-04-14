@@ -47,3 +47,10 @@ verifactai/.pytest_cache/
 
 # macOS app build artifacts
 verifactai/desktop/*.app
+
+# Node / Next.js
+node_modules/
+web/node_modules/
+web/.next/
+web/out/
+.next/

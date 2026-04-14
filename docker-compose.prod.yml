@@ -1,11 +1,9 @@
-version: "3.9"
-
 services:
   verifact-api:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["python", "verifactai/overlay_server.py"]
+    command: ["python", "verifactai/startup.py"]
     env_file:
       - verifactai/.env
     environment:

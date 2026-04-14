@@ -15,6 +15,7 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+from urllib.parse import urlsplit
 
 from config import Config
 from core.hallucination_discriminator import HallucinationDiscriminator
@@ -30,6 +31,17 @@ _PIPELINE_LOCK = threading.Lock()
 _RISK_CLASSIFIER: RiskClassifier | None = None
 _DISCRIMINATOR: HallucinationDiscriminator | None = None
 _API_TOKEN = os.environ.get("VERIFACT_API_TOKEN", "").strip()
+_ENV = os.environ.get("VERIFACT_ENV", "development").strip().lower()
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    return val.strip().lower() in {"1", "true", "yes", "on"}
+
+
+_REQUIRE_AUTH = _env_bool("VERIFACT_REQUIRE_AUTH", _ENV in {"production", "prod"})
 _ENABLE_RISK_CLASSIFIER = os.environ.get("VERIFACT_ENABLE_RISK_CLASSIFIER", "1") == "1"
 _ENABLE_DISCRIMINATOR = os.environ.get("VERIFACT_ENABLE_DISCRIMINATOR", "0") == "1"
 _DISCRIMINATOR_PATH = os.environ.get(
@@ -38,12 +50,21 @@ _DISCRIMINATOR_PATH = os.environ.get(
 
 # CORS origins — configurable via env for production (comma-separated)
 _EXTRA_ORIGINS = os.environ.get("VERIFACT_CORS_ORIGINS", "").strip()
-_ALLOWED_ORIGIN_PREFIXES = (
+_DEFAULT_ALLOWED_ORIGINS = {
     "https://chatgpt.com",
     "https://chat.openai.com",
     "https://claude.ai",
     "https://gemini.google.com",
-) + tuple(o.strip() for o in _EXTRA_ORIGINS.split(",") if o.strip())
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8501",
+    "http://127.0.0.1:8501",
+}
+_ALLOWED_ORIGINS = _DEFAULT_ALLOWED_ORIGINS | {
+    o.strip().rstrip("/") for o in _EXTRA_ORIGINS.split(",") if o.strip()
+}
 
 # Rate limiter — simple in-memory per-IP (resets on restart)
 _RATE_LIMIT = int(os.environ.get("VERIFACT_RATE_LIMIT", "20"))  # requests per minute
@@ -65,6 +86,18 @@ def _check_rate_limit(ip: str) -> bool:
             return False
         _rate_buckets[ip].append(now)
         return True
+
+
+def _normalized_origin(origin: str) -> str | None:
+    if not origin:
+        return None
+    try:
+        parsed = urlsplit(origin)
+    except Exception:
+        return None
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
 
 def get_pipeline() -> VeriFactPipeline:
@@ -249,21 +282,33 @@ class OverlayHandler(BaseHTTPRequestHandler):
         origin = (self.headers.get("Origin") or "").strip()
         if not origin:
             return True
-        return any(origin.startswith(prefix) for prefix in _ALLOWED_ORIGIN_PREFIXES)
+        normalized = _normalized_origin(origin)
+        return bool(normalized and normalized in _ALLOWED_ORIGINS)
 
     def _is_authorized(self) -> bool:
-        if not _API_TOKEN:
+        if not _REQUIRE_AUTH:
             return True
+
+        if not _API_TOKEN:
+            return False
+
         token = (self.headers.get("X-VeriFact-Token") or "").strip()
         return bool(token) and token == _API_TOKEN
 
     def _json_response(self, code: int, payload: dict[str, Any]) -> None:
         body = json.dumps(payload).encode("utf-8")
+        request_origin = (self.headers.get("Origin") or "").strip()
+        response_origin = "*"
+        normalized = _normalized_origin(request_origin)
+        if normalized and normalized in _ALLOWED_ORIGINS:
+            response_origin = normalized
+
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         # CORS
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", response_origin)
+        self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-VeriFact-Token")
         # Security headers
@@ -296,6 +341,15 @@ class OverlayHandler(BaseHTTPRequestHandler):
             return
 
         if not self._is_authorized():
+            if _REQUIRE_AUTH and not _API_TOKEN:
+                self._json_response(
+                    503,
+                    {
+                        "error": "server_misconfigured",
+                        "message": "VERIFACT_REQUIRE_AUTH is enabled but VERIFACT_API_TOKEN is empty",
+                    },
+                )
+                return
             self._json_response(401, {"error": "unauthorized"})
             return
 
@@ -350,6 +404,10 @@ def run() -> None:
     print("=" * 50)
     print(f"  Listening on http://{host}:{port}")
     print(f"  Rate limit: {_RATE_LIMIT} req/min per IP")
+    print(f"  Environment: {_ENV}")
+    print(f"  Require auth: {'yes' if _REQUIRE_AUTH else 'no'}")
+    if _REQUIRE_AUTH and not _API_TOKEN:
+        print("  WARNING: auth required but VERIFACT_API_TOKEN is not set")
     print("  Press Ctrl+C to stop")
     print("=" * 50)
 

@@ -1,7 +1,19 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Head from "next/head";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8765";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_VERIFACT_API_BASE ||
+  "http://127.0.0.1:8765";
+
+const EXAMPLES = {
+  "Einstein mixed":
+    "Albert Einstein invented the telephone in 1876. He was born in Germany and won the Nobel Prize in Physics in 1921.",
+  "Medical":
+    "Aspirin is commonly used as a blood thinner and was first synthesized in 1897 by Felix Hoffmann at Bayer.",
+  "Deliberate hallucination":
+    "The Great Wall of China is in South America and is 50 meters long.",
+};
 
 const VERDICT_STYLE = {
   SUPPORTED: { bg: "rgba(26, 122, 82, 0.15)", border: "#1a7a52", label: "Supported" },
@@ -15,6 +27,14 @@ export default function Home() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [minConfidence, setMinConfidence] = useState(0);
+  const [verdictFilter, setVerdictFilter] = useState([
+    "SUPPORTED",
+    "CONTRADICTED",
+    "UNVERIFIABLE",
+    "NO_EVIDENCE",
+  ]);
 
   const analyze = async () => {
     if (!text.trim()) return;
@@ -41,6 +61,20 @@ export default function Home() {
 
   const scoreColor = (s) => (s >= 75 ? "#1a7a52" : s >= 40 ? "#a06a10" : "#b03030");
 
+  const filteredFlags = useMemo(() => {
+    if (!result?.flags) return [];
+    return result.flags.filter((c) => {
+      const confPct = Math.round((c.confidence || 0) * 100);
+      return verdictFilter.includes(c.verdict) && confPct >= minConfidence;
+    });
+  }, [result, verdictFilter, minConfidence]);
+
+  const toggleVerdict = (v) => {
+    setVerdictFilter((current) =>
+      current.includes(v) ? current.filter((x) => x !== v) : [...current, v]
+    );
+  };
+
   return (
     <>
       <Head>
@@ -57,6 +91,29 @@ export default function Home() {
         <p style={{ color: "#3a4a58", marginBottom: "1.5rem" }}>
           Paste any AI-generated text to verify its factual accuracy.
         </p>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+          {Object.entries(EXAMPLES).map(([k, v]) => (
+            <button
+              key={k}
+              onClick={() => {
+                setText(v);
+                setError(null);
+              }}
+              style={{
+                border: "1px solid #c0cad4",
+                background: "#ffffff",
+                color: "#0f1a24",
+                borderRadius: 999,
+                padding: "0.35rem 0.7rem",
+                fontSize: "0.78rem",
+                cursor: "pointer",
+              }}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
 
         <textarea
           value={text}
@@ -109,46 +166,109 @@ export default function Home() {
 
         {result && (
           <div style={{ marginTop: 24 }}>
-
-            {/* Score banner */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: 20,
-              padding: "1rem", borderRadius: 14,
-              background: "rgba(255,255,255,0.8)",
-              border: "1px solid #d0d8e0", marginBottom: 16,
-            }}>
-              <div style={{ textAlign: "center", minWidth: 80 }}>
-                <div style={{ fontSize: "2.4rem", fontWeight: 800, color: scoreColor(result.factuality_score) }}>
-                  {Math.round(result.factuality_score)}
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "#3a4a58" }}>Score</div>
-              </div>
-              <div style={{ fontSize: "0.85rem", color: "#3a4a58", lineHeight: 1.6 }}>
-                <strong>{result.total_claims}</strong> claims analyzed in <strong>{result.processing_time?.toFixed(1)}s</strong><br />
-                {result.supported} supported · {result.contradicted} contradicted · {result.unverifiable + result.no_evidence} uncertain
-              </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              {[
+                ["overview", "Overview"],
+                ["claims", "Claims"],
+                ["alerts", "Alerts"],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  style={{
+                    border: `1px solid ${activeTab === id ? "#1a6e88" : "#c0cad4"}`,
+                    background: activeTab === id ? "#e5f2f7" : "#fff",
+                    color: "#0f1a24",
+                    borderRadius: 10,
+                    padding: "0.45rem 0.75rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
-            {/* Alerts */}
-            {result.alerts && result.alerts.length > 0 && (
+            {activeTab === "overview" && (
+              <>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 20,
+                  padding: "1rem", borderRadius: 14,
+                  background: "rgba(255,255,255,0.8)",
+                  border: "1px solid #d0d8e0", marginBottom: 16,
+                }}>
+                  <div style={{ textAlign: "center", minWidth: 80 }}>
+                    <div style={{ fontSize: "2.4rem", fontWeight: 800, color: scoreColor(result.factuality_score) }}>
+                      {Math.round(result.factuality_score)}
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#3a4a58" }}>Score</div>
+                  </div>
+                  <div style={{ fontSize: "0.85rem", color: "#3a4a58", lineHeight: 1.6 }}>
+                    <strong>{result.total_claims}</strong> claims analyzed in <strong>{result.processing_time?.toFixed(1)}s</strong><br />
+                    {result.supported} supported · {result.contradicted} contradicted · {result.unverifiable + result.no_evidence} uncertain
+                  </div>
+                </div>
+              </>
+            )}
+
+            {activeTab === "alerts" && (
               <div style={{ marginBottom: 16 }}>
                 <h3 style={{ fontSize: "1rem", marginBottom: 8 }}>Alerts</h3>
-                {result.alerts.map((a, i) => (
-                  <div key={i} style={{
-                    padding: "0.6rem 0.8rem", borderRadius: 10, marginBottom: 6,
-                    background: a.category === "hallucination" ? "rgba(176,48,48,0.1)" : "rgba(160,106,16,0.1)",
-                    borderLeft: `3px solid ${a.category === "hallucination" ? "#b03030" : "#a06a10"}`,
-                    fontSize: "0.85rem",
-                  }}>
-                    <strong>{a.severity.toUpperCase()}</strong>: {a.message}
-                  </div>
-                ))}
+                {result.alerts && result.alerts.length > 0 ? (
+                  result.alerts.map((a, i) => (
+                    <div key={i} style={{
+                      padding: "0.6rem 0.8rem", borderRadius: 10, marginBottom: 6,
+                      background: a.category === "hallucination" ? "rgba(176,48,48,0.1)" : "rgba(160,106,16,0.1)",
+                      borderLeft: `3px solid ${a.category === "hallucination" ? "#b03030" : "#a06a10"}`,
+                      fontSize: "0.85rem",
+                    }}>
+                      <strong>{a.severity.toUpperCase()}</strong>: {a.message}
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ color: "#5a6a79", fontSize: "0.88rem" }}>No alerts in this response.</div>
+                )}
               </div>
             )}
 
-            {/* Claims */}
-            <h3 style={{ fontSize: "1rem", marginBottom: 8 }}>Claims</h3>
-            {result.flags && result.flags.map((c, i) => {
+            {activeTab === "claims" && (
+              <>
+                <h3 style={{ fontSize: "1rem", marginBottom: 8 }}>Claims</h3>
+                <div style={{ marginBottom: 10, display: "grid", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {Object.keys(VERDICT_STYLE).map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => toggleVerdict(v)}
+                        style={{
+                          border: `1px solid ${verdictFilter.includes(v) ? "#1a6e88" : "#c0cad4"}`,
+                          background: verdictFilter.includes(v) ? "#e5f2f7" : "#fff",
+                          color: "#0f1a24",
+                          borderRadius: 999,
+                          padding: "0.3rem 0.65rem",
+                          fontSize: "0.76rem",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {VERDICT_STYLE[v].label}
+                      </button>
+                    ))}
+                  </div>
+                  <label style={{ fontSize: "0.82rem", color: "#3a4a58" }}>
+                    Minimum confidence: {minConfidence}%
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={minConfidence}
+                    onChange={(e) => setMinConfidence(Number(e.target.value))}
+                  />
+                </div>
+
+                {filteredFlags.map((c, i) => {
               const vs = VERDICT_STYLE[c.verdict] || VERDICT_STYLE.NO_EVIDENCE;
               return (
                 <div key={i} style={{
@@ -174,7 +294,15 @@ export default function Home() {
                   )}
                 </div>
               );
-            })}
+                })}
+
+                {filteredFlags.length === 0 && (
+                  <div style={{ color: "#5a6a79", fontSize: "0.88rem" }}>
+                    No claims match the active filters.
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
