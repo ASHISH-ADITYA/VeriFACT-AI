@@ -43,13 +43,15 @@ class Evidence:
 
 
 class EvidenceRetriever:
-    """FAISS-backed dense retriever with sentence-transformer encoding."""
+    """Hybrid retriever: dense (FAISS) + sparse (BM25) + cross-encoder reranker."""
 
     def __init__(self, config: Config) -> None:
         self.config = config
         self._faiss_lock = threading.Lock()
         self._use_numpy_search = os.environ.get("VERIFACTAI_USE_NUMPY_SEARCH", "0") == "1"
         self._embedding_matrix: np.ndarray | None = None
+        self._bm25 = None
+        self._reranker = None
         configure_faiss_threads()
         rc = config.retrieval
         ec = config.embedding
@@ -72,7 +74,6 @@ class EvidenceRetriever:
 
         if self._use_numpy_search:
             logger.warning("VERIFACTAI_USE_NUMPY_SEARCH=1: using NumPy retrieval fallback")
-            # For IndexFlat* we can reconstruct vectors and avoid FAISS search calls.
             self._embedding_matrix = self.index.reconstruct_n(0, self.index.ntotal).astype(
                 np.float32
             )
@@ -83,28 +84,171 @@ class EvidenceRetriever:
         logger.info(f"Loading metadata from {meta_path}")
         self.metadata = self._load_metadata(meta_path)
 
+        # ── BM25 sparse index ─────────────────────────────────
+        self._init_bm25()
+
+        # ── Cross-encoder reranker ────────────────────────────
+        self._init_reranker()
+
+    def _init_bm25(self) -> None:
+        """Build BM25 index from metadata texts."""
+        try:
+            from rank_bm25 import BM25Okapi
+
+            corpus = [m.get("text", "") for m in self.metadata]
+            tokenized = [doc.lower().split() for doc in corpus]
+            self._bm25 = BM25Okapi(tokenized)
+            logger.info(f"BM25 index built ({len(corpus):,} documents)")
+        except ImportError:
+            logger.warning("rank-bm25 not installed — using dense retrieval only")
+        except Exception as exc:
+            logger.warning(f"BM25 init failed ({exc}) — using dense retrieval only")
+
+    def _init_reranker(self) -> None:
+        """Load cross-encoder reranker for evidence quality improvement."""
+        try:
+            from sentence_transformers import CrossEncoder
+
+            model_name = os.environ.get(
+                "VERIFACT_RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+            )
+            self._reranker = CrossEncoder(model_name)
+            logger.info(f"Cross-encoder reranker loaded: {model_name}")
+        except Exception as exc:
+            logger.warning(f"Reranker init failed ({exc}) — skipping reranking")
+
     # ------------------------------------------------------------------
     @timed
     def retrieve(self, claim_text: str, top_k: int | None = None) -> list[Evidence]:
-        """Retrieve evidence for a single claim."""
+        """Hybrid retrieve: dense + BM25 + rerank."""
         if self.index is None:
             return []
         k = top_k or self.config.retrieval.top_k
-        embedding = self.encoder.encode(
-            [claim_text],
-            normalize_embeddings=self.config.embedding.normalize,
-        )
-        query = np.array(embedding, dtype=np.float32)
-        if self._use_numpy_search and self._embedding_matrix is not None:
-            scores, indices = self._numpy_search(query, k)
-        else:
-            with self._faiss_lock:
-                scores, indices = self.index.search(query, k)
-        return self._build_evidence(scores[0], indices[0])
+        # Fetch more candidates for fusion, then rerank down to k
+        fetch_k = max(k * 5, 20)
+
+        candidates = self._hybrid_fetch(claim_text, fetch_k)
+        reranked = self._rerank(claim_text, candidates, k)
+        return reranked
 
     @timed
     def batch_retrieve(self, claims: list[str], top_k: int | None = None) -> list[list[Evidence]]:
-        """Batch retrieval for multiple claims — single FAISS call."""
+        """Batch hybrid retrieval: dense + BM25 + rerank per claim."""
+        if self.index is None:
+            return [[] for _ in claims]
+        return [self.retrieve(claim, top_k) for claim in claims]
+
+    # ------------------------------------------------------------------
+    # Hybrid fetch: dense FAISS + sparse BM25 with reciprocal rank fusion
+    # ------------------------------------------------------------------
+    def _hybrid_fetch(self, query: str, fetch_k: int) -> list[Evidence]:
+        """Combine dense and sparse retrieval with reciprocal rank fusion."""
+        # Dense retrieval (FAISS)
+        dense_results = self._dense_fetch(query, fetch_k)
+
+        # Sparse retrieval (BM25)
+        bm25_results = self._bm25_fetch(query, fetch_k) if self._bm25 else []
+
+        if not bm25_results:
+            return dense_results
+
+        # Reciprocal Rank Fusion (RRF)
+        rrf_k = 60  # standard RRF constant
+        scored: dict[int, float] = {}  # chunk_id → fused score
+        evidence_map: dict[int, Evidence] = {}
+
+        for rank, ev in enumerate(dense_results):
+            scored[ev.chunk_id] = scored.get(ev.chunk_id, 0) + 1.0 / (rrf_k + rank + 1)
+            evidence_map[ev.chunk_id] = ev
+
+        for rank, ev in enumerate(bm25_results):
+            scored[ev.chunk_id] = scored.get(ev.chunk_id, 0) + 1.0 / (rrf_k + rank + 1)
+            if ev.chunk_id not in evidence_map:
+                evidence_map[ev.chunk_id] = ev
+
+        # Sort by fused score descending
+        sorted_ids = sorted(scored, key=lambda cid: scored[cid], reverse=True)
+        return [evidence_map[cid] for cid in sorted_ids[:fetch_k]]
+
+    def _dense_fetch(self, query: str, k: int) -> list[Evidence]:
+        """Pure FAISS dense retrieval."""
+        embedding = self.encoder.encode([query], normalize_embeddings=self.config.embedding.normalize)
+        query_vec = np.array(embedding, dtype=np.float32)
+        if self._use_numpy_search and self._embedding_matrix is not None:
+            scores, indices = self._numpy_search(query_vec, k)
+        else:
+            with self._faiss_lock:
+                scores, indices = self.index.search(query_vec, k)
+        return self._build_evidence(scores[0], indices[0])
+
+    def _bm25_fetch(self, query: str, k: int) -> list[Evidence]:
+        """BM25 sparse retrieval."""
+        if self._bm25 is None:
+            return []
+        tokens = query.lower().split()
+        scores = self._bm25.get_scores(tokens)
+        top_indices = np.argsort(scores)[::-1][:k]
+        threshold = self.config.retrieval.relevance_threshold
+        results = []
+        for idx in top_indices:
+            idx = int(idx)
+            score = float(scores[idx])
+            if score <= 0 or idx >= len(self.metadata):
+                continue
+            meta = self.metadata[idx]
+            # Normalize BM25 score to 0-1 range (approximate)
+            norm_score = min(score / 30.0, 1.0)
+            if norm_score < threshold:
+                continue
+            results.append(Evidence(
+                text=meta["text"],
+                source=meta.get("source", "unknown"),
+                title=meta.get("title", ""),
+                url=meta.get("url", ""),
+                similarity=norm_score,
+                chunk_id=idx,
+            ))
+        return results
+
+    # ------------------------------------------------------------------
+    # Cross-encoder reranking
+    # ------------------------------------------------------------------
+    def _rerank(self, query: str, candidates: list[Evidence], top_k: int) -> list[Evidence]:
+        """Rerank candidates using cross-encoder for better evidence quality."""
+        if not candidates:
+            return []
+        if self._reranker is None or len(candidates) <= top_k:
+            return candidates[:top_k]
+
+        # Cross-encoder scores (query, passage) pairs
+        pairs = [(query, ev.text) for ev in candidates]
+        try:
+            rerank_scores = self._reranker.predict(pairs, show_progress_bar=False)
+            # Update similarity scores with reranker scores
+            scored = list(zip(candidates, rerank_scores, strict=False))
+            scored.sort(key=lambda x: x[1], reverse=True)
+            reranked = []
+            for ev, score in scored[:top_k]:
+                # Use reranker score as the new similarity (sigmoid-normalized)
+                ev_copy = Evidence(
+                    text=ev.text,
+                    source=ev.source,
+                    title=ev.title,
+                    url=ev.url,
+                    similarity=float(1 / (1 + np.exp(-score))),  # sigmoid
+                    chunk_id=ev.chunk_id,
+                )
+                reranked.append(ev_copy)
+            return reranked
+        except Exception as exc:
+            logger.warning(f"Reranking failed ({exc}) — returning dense results")
+            return candidates[:top_k]
+
+    # ------------------------------------------------------------------
+    # Legacy batch_retrieve for backwards compatibility
+    # ------------------------------------------------------------------
+    def _legacy_batch_retrieve(self, claims: list[str], top_k: int | None = None) -> list[list[Evidence]]:
+        """Original FAISS-only batch retrieval (kept for fallback)."""
         if self.index is None:
             return [[] for _ in claims]
         k = top_k or self.config.retrieval.top_k
