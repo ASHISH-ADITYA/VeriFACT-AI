@@ -7,6 +7,19 @@ from core.claim_decomposer import Claim
 from core.evidence_retriever import Evidence
 
 
+class _SequenceLLM:
+    def __init__(self, outputs: list[str]) -> None:
+        self.outputs = outputs
+        self.idx = 0
+
+    def generate(self, **kwargs):
+        if self.idx >= len(self.outputs):
+            return self.outputs[-1]
+        out = self.outputs[self.idx]
+        self.idx += 1
+        return out
+
+
 class TestJsonReport:
     """Test structured JSON output generation."""
 
@@ -83,3 +96,35 @@ class TestHtmlAnnotation:
         html = gen.generate_html('<script>alert("xss")</script>', [])
         assert "<script>" not in html
         assert "&lt;script&gt;" in html
+
+
+class TestCorrectionRefinement:
+    def test_reflexion_and_constitutional_refinement(self):
+        claim = Claim(id="c-0", text="Wrong claim", source_sentence="Wrong claim")
+        claim.verdict = "CONTRADICTED"
+        claim.best_evidence = Evidence(
+            text="Evidence says the correct fact.",
+            source="wikipedia",
+            title="T",
+            url="",
+            similarity=0.9,
+            chunk_id=0,
+        )
+
+        llm = _SequenceLLM(
+            [
+                "Initial correction",
+                '{"revised_correction": "Reflexion revised correction"}',
+                '{"revised_correction": "Constitutional revised correction"}',
+            ]
+        )
+        gen = AnnotatedOutputGenerator(
+            llm=llm,
+            reflexion_enabled=True,
+            reflexion_rounds=1,
+            constitutional_enabled=True,
+            constitutional_rounds=1,
+        )
+
+        gen.generate_corrections([claim])
+        assert claim.correction == "Constitutional revised correction"

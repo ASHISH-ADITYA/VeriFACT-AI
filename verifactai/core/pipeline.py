@@ -66,6 +66,8 @@ class VeriFactPipeline:
             llm=self.llm,
             reflexion_enabled=self.config.reflexion.enabled,
             reflexion_rounds=self.config.reflexion.max_rounds,
+            constitutional_enabled=self.config.constitutional.enabled,
+            constitutional_rounds=self.config.constitutional.max_rounds,
         )
 
         self._cache: dict[str, VerificationResult] = {}
@@ -108,7 +110,8 @@ class VeriFactPipeline:
             if selfcheck:
                 blend = min(max(self.config.selfcheck.confidence_blend_weight, 0.0), 1.0)
                 claim.confidence = round(
-                    (1.0 - blend) * float(claim.confidence) + blend * float(selfcheck["consistency"]),
+                    (1.0 - blend) * float(claim.confidence)
+                    + blend * float(selfcheck["consistency"]),
                     4,
                 )
                 claim.uncertainty = round(
@@ -123,6 +126,9 @@ class VeriFactPipeline:
                         "selfcheck_consistency": selfcheck["consistency"],
                         "selfcheck_entropy": selfcheck["entropy"],
                         "selfcheck_disagreement": selfcheck["disagreement"],
+                        "selfcheck_semantic_cluster_entropy": selfcheck[
+                            "semantic_cluster_entropy"
+                        ],
                         "selfcheck_distribution": selfcheck["distribution"],
                         "selfcheck_majority_label": selfcheck["majority_label"],
                         "selfcheck_valid_samples": selfcheck["valid_samples"],

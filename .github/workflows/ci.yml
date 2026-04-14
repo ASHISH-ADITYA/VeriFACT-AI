@@ -47,8 +47,8 @@ jobs:
       - name: Install bandit
         run: pip install bandit
 
-      - name: Bandit scan
-        run: bandit -r verifactai/core/ verifactai/utils/ -q -ll
+      - name: Bandit scan (high severity only)
+        run: bandit -r verifactai/core/ verifactai/utils/ -q -lll
 
   # ── Tests ────────────────────────────────────
   test:

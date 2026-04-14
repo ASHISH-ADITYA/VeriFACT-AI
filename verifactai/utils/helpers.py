@@ -49,8 +49,8 @@ def timed(func: Callable[..., T]) -> Callable[..., T]:
 
 
 def md5_hash(text: str) -> str:
-    """Deterministic cache key for a text input."""
-    return hashlib.md5(text.encode("utf-8")).hexdigest()
+    """Deterministic cache key for a text input (not used for security)."""
+    return hashlib.md5(text.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def retry_with_backoff(

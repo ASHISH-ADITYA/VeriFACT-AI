@@ -22,9 +22,9 @@ Legend:
 | architecture/9.md | RAG system design patterns | Implemented | FAISS retrieval pipeline in core |
 | architecture/10.md | RAG model variants / stronger retrieval-generation coupling | Partial | Retrieval present; no end-to-end RAG-Token-style training |
 | architecture/11.md | Reflexion self-reflection loop | Partial | Critique-revise loop added for contradiction corrections; no full actor-evaluator loop |
-| architecture/12.md | Constitutional critique/revision safety loop | Planned | No constitutional self-critique loop in runtime |
+| architecture/12.md | Constitutional critique/revision safety loop | Partial | Constitutional critique-revise pass added for contradicted-claim corrections |
 | architecture/AAA.md | SelfCheckGPT self-consistency checks | Implemented | Multi-sample sampled judgement loop with consistency distribution + uncertainty blending |
-| architecture/s41586-024-07421-0.md | Semantic entropy uncertainty signal | Partial | Entropy+disagreement proxy integrated at NLI evidence level |
+| architecture/s41586-024-07421-0.md | Semantic entropy uncertainty signal | Partial | Label entropy + rationale-cluster entropy integrated in SelfCheck pipeline |
 
 ## Newly Implemented in this upgrade
 
@@ -37,10 +37,13 @@ Legend:
 3. Reflexion-style correction refinement
 - Added a critique-and-revise loop for contradicted-claim corrections to reduce unsupported wording.
 
-4. Uncertainty-aware confidence fusion (research-inspired)
+4. Constitutional critique layer
+- Added a constitutional critique-and-revise pass to enforce no-fabrication and uncertainty-aware wording.
+
+5. Uncertainty-aware confidence fusion (research-inspired)
 - Existing entropy/disagreement uncertainty proxy remains active in the NLI verdict engine.
 
-5. Optional classifier-assisted risk signaling
+6. Optional classifier-assisted risk signaling
 - Existing optional local risk classifier remains integrated with fail-soft behavior.
 
 ## Evidence Files
@@ -60,4 +63,3 @@ Legend:
 1. Upgrade semantic entropy from label-level sampling to meaning-cluster entropy over generated explanations.
 2. Add learned hallucination discriminator training path.
 3. Add domain-specific evaluation pack (legal + real-world chat corpus).
-4. Add constitutional critique-and-revision layer.

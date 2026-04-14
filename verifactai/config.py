@@ -171,6 +171,9 @@ class SelfCheckConfig(BaseModel):
     uncertainty_disagreement_weight: float = Field(
         default_factory=lambda: float(os.getenv("SELFCHECK_DISAGREEMENT_WEIGHT", "0.4"))
     )
+    semantic_cluster_weight: float = Field(
+        default_factory=lambda: float(os.getenv("SELFCHECK_SEMANTIC_CLUSTER_WEIGHT", "0.3"))
+    )
     confidence_blend_weight: float = Field(
         default_factory=lambda: float(os.getenv("SELFCHECK_CONF_BLEND", "0.2"))
     )
@@ -181,6 +184,17 @@ class ReflexionConfig(BaseModel):
 
     enabled: bool = Field(default_factory=lambda: os.getenv("REFLEXION_ENABLED", "1") == "1")
     max_rounds: int = Field(default_factory=lambda: int(os.getenv("REFLEXION_MAX_ROUNDS", "1")))
+
+
+class ConstitutionalConfig(BaseModel):
+    """Constitutional critique-and-revision controls for safe corrections."""
+
+    enabled: bool = Field(
+        default_factory=lambda: os.getenv("CONSTITUTIONAL_ENABLED", "1") == "1"
+    )
+    max_rounds: int = Field(
+        default_factory=lambda: int(os.getenv("CONSTITUTIONAL_MAX_ROUNDS", "1"))
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +212,7 @@ class Config(BaseModel):
     confidence: ConfidenceConfig = Field(default_factory=ConfidenceConfig)
     selfcheck: SelfCheckConfig = Field(default_factory=SelfCheckConfig)
     reflexion: ReflexionConfig = Field(default_factory=ReflexionConfig)
+    constitutional: ConstitutionalConfig = Field(default_factory=ConstitutionalConfig)
 
     project_root: Path = _PROJECT_ROOT
     log_level: str = "INFO"

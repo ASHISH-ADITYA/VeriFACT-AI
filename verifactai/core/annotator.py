@@ -54,6 +54,23 @@ Return only JSON:
     "revised_correction": "improved 1-2 sentence correction grounded only in the evidence"
 }}"""
 
+_CONSTITUTIONAL_CRITIQUE_PROMPT = """\
+You are a constitutional safety reviewer for factual corrections.
+Apply these principles:
+1) Do not invent facts not present in evidence.
+2) Use uncertainty language when evidence is incomplete.
+3) Keep corrections concise and neutral.
+
+Claim: {claim}
+Evidence: {evidence}
+Draft correction: {draft}
+
+Return only JSON:
+{{
+    "violations": ["short issue"],
+    "revised_correction": "constitution-compliant correction"
+}}"""
+
 
 class AnnotatedOutputGenerator:
     """Produce annotated HTML and structured JSON from verified claims."""
@@ -63,10 +80,14 @@ class AnnotatedOutputGenerator:
         llm: LLMClient | None = None,
         reflexion_enabled: bool = True,
         reflexion_rounds: int = 1,
+        constitutional_enabled: bool = True,
+        constitutional_rounds: int = 1,
     ) -> None:
         self.llm = llm  # optional — used for correction generation
         self.reflexion_enabled = reflexion_enabled
         self.reflexion_rounds = max(reflexion_rounds, 0)
+        self.constitutional_enabled = constitutional_enabled
+        self.constitutional_rounds = max(constitutional_rounds, 0)
 
     # ------------------------------------------------------------------
     # HTML annotation
@@ -204,6 +225,8 @@ class AnnotatedOutputGenerator:
 
                 if self.reflexion_enabled and self.reflexion_rounds > 0:
                     claim.correction = self._refine_correction(claim)
+                if self.constitutional_enabled and self.constitutional_rounds > 0:
+                    claim.correction = self._constitutional_refine(claim)
             except Exception as exc:
                 logger.warning(f"Correction generation failed for {claim.id}: {exc}")
                 claim.correction = None
@@ -254,3 +277,31 @@ class AnnotatedOutputGenerator:
             tail = tail.replace(":", " ").strip().strip('"')
             return tail if tail else None
         return None
+
+    def _constitutional_refine(self, claim: Claim) -> str | None:
+        """Apply a constitutional critique-and-revise loop for safer corrections."""
+        current = claim.correction
+        if not current or self.llm is None or not claim.best_evidence:
+            return current
+
+        for _ in range(self.constitutional_rounds):
+            critique_prompt = _CONSTITUTIONAL_CRITIQUE_PROMPT.format(
+                claim=claim.text,
+                evidence=claim.best_evidence.text,
+                draft=current,
+            )
+            raw = self.llm.generate(
+                user=critique_prompt,
+                system="You are a strict constitutional editor.",
+                temperature=0.0,
+                max_tokens=256,
+            )
+            if not raw:
+                break
+
+            revised = self._extract_revised_correction(raw)
+            if not revised:
+                break
+            current = revised
+
+        return current

@@ -13,7 +13,12 @@ import re
 from collections import Counter
 from typing import TYPE_CHECKING
 
-from core.semantic_entropy import disagreement_ratio, label_distribution, normalized_entropy
+from core.semantic_entropy import (
+    cluster_entropy,
+    disagreement_ratio,
+    label_distribution,
+    normalized_entropy,
+)
 from utils.helpers import logger
 
 if TYPE_CHECKING:
@@ -49,14 +54,11 @@ class SelfCheckScorer:
 
         evidence_block = self._build_evidence_block(evidence[: max(sc.max_evidence, 1)])
         labels: list[str] = []
+        rationales: list[str] = []
 
         for i in range(max(sc.samples, 1)):
             temperature = min(1.0, sc.temperature_start + i * sc.temperature_step)
-            user_prompt = (
-                f"Claim: {claim_text}\n\n"
-                f"Evidence:\n{evidence_block}\n\n"
-                "Return JSON only."
-            )
+            user_prompt = f"Claim: {claim_text}\n\nEvidence:\n{evidence_block}\n\nReturn JSON only."
             try:
                 raw = self.llm.generate(
                     user=user_prompt,
@@ -64,9 +66,11 @@ class SelfCheckScorer:
                     temperature=temperature,
                     max_tokens=160,
                 )
-                label = self._parse_label(raw)
+                label, rationale = self._parse_sample(raw)
                 if label is not None:
                     labels.append(label)
+                if rationale:
+                    rationales.append(rationale)
             except Exception as exc:
                 logger.warning(f"SelfCheck sample failed: {exc}")
 
@@ -79,11 +83,14 @@ class SelfCheckScorer:
 
         entropy = normalized_entropy(labels, _CLASSES)
         disagreement = disagreement_ratio(labels)
+        semantic_entropy = cluster_entropy(rationales, threshold=0.5)
 
-        uncertainty = (
-            sc.uncertainty_entropy_weight * entropy
-            + sc.uncertainty_disagreement_weight * disagreement
-        )
+        ew = max(sc.uncertainty_entropy_weight, 0.0)
+        dw = max(sc.uncertainty_disagreement_weight, 0.0)
+        sw = max(sc.semantic_cluster_weight, 0.0)
+        denom = max(ew + dw + sw, 1e-8)
+
+        uncertainty = (ew * entropy + dw * disagreement + sw * semantic_entropy) / denom
         uncertainty = min(max(uncertainty, 0.0), 1.0)
         stability = 1.0 - uncertainty
 
@@ -92,6 +99,7 @@ class SelfCheckScorer:
             "consistency": round(consistency, 4),
             "entropy": round(entropy, 4),
             "disagreement": round(disagreement, 4),
+            "semantic_cluster_entropy": round(semantic_entropy, 4),
             "uncertainty": round(uncertainty, 4),
             "stability": round(stability, 4),
             "distribution": label_distribution(labels, _CLASSES),
@@ -109,18 +117,20 @@ class SelfCheckScorer:
         return "\n\n".join(lines)
 
     @staticmethod
-    def _parse_label(raw: str | None) -> str | None:
+    def _parse_sample(raw: str | None) -> tuple[str | None, str | None]:
         if not raw:
-            return None
+            return (None, None)
 
         text = raw.strip()
         try:
             parsed = json.loads(text)
             label = str(parsed.get("label", "")).strip().lower()
+            rationale = str(parsed.get("rationale", "")).strip()
             if label in _CLASSES:
-                return label
+                return (label, rationale or None)
         except Exception:
             pass
 
         match = re.search(r"supported|contradicted|uncertain", text.lower())
-        return match.group(0) if match else None
+        label = match.group(0) if match else None
+        return (label, None)
