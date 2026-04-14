@@ -1,0 +1,11 @@
+# Default owner for everything
+* @ASHISH-ADITYA
+
+# Core pipeline
+verifactai/core/ @ASHISH-ADITYA
+
+# Extension
+verifactai/integrations/ @ASHISH-ADITYA
+
+# CI/CD
+.github/ @ASHISH-ADITYA

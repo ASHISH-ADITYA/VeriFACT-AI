@@ -1,5 +1,5 @@
 VeriFact Acceptance Audit
-Generated: Tue Apr 14 03:06:28 IST 2026
+Generated: Tue Apr 14 22:14:33 IST 2026
 
 [PASS] Overlay server present
 [PASS] Desktop app present

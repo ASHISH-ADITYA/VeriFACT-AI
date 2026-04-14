@@ -1,0 +1,127 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "verifact-ai"
+version = "1.0.0"
+description = "Verification & Truth Layer for AI — Real-time LLM hallucination detection"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Aditya Ashish"},
+]
+keywords = ["hallucination-detection", "nlp", "nli", "fact-checking", "llm", "ai-safety"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch>=2.0.0",
+    "transformers>=4.35.0",
+    "sentence-transformers>=2.2.0",
+    "faiss-cpu>=1.7.4",
+    "spacy>=3.7.0",
+    "datasets>=2.15.0",
+    "anthropic>=0.39.0",
+    "openai>=1.6.0",
+    "streamlit>=1.29.0",
+    "plotly>=5.18.0",
+    "pandas>=2.1.0",
+    "numpy>=1.24.0",
+    "tqdm>=4.66.0",
+    "scikit-learn>=1.3.0",
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.0",
+    "pydantic>=2.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4.0",
+    "mypy>=1.8",
+    "pre-commit>=3.6",
+    "bandit>=1.7",
+]
+desktop = [
+    "pywebview>=5.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/ASHISH-ADITYA/VeriFACT-AI"
+Repository = "https://github.com/ASHISH-ADITYA/VeriFACT-AI"
+Issues = "https://github.com/ASHISH-ADITYA/VeriFACT-AI/issues"
+Changelog = "https://github.com/ASHISH-ADITYA/VeriFACT-AI/blob/main/CHANGELOG.md"
+
+# ─────────────────────────────────────────────
+# Ruff — fast Python linter + formatter
+# ─────────────────────────────────────────────
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["verifactai"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "TCH",  # flake8-type-checking
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function call in argument defaults
+    "SIM108", # ternary operator suggestion
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["verifactai", "core", "evaluation", "utils"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ─────────────────────────────────────────────
+# Pytest
+# ─────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["verifactai/tests"]
+pythonpath = ["verifactai"]
+addopts = "-v --tb=short"
+
+# ─────────────────────────────────────────────
+# Mypy — static type checking
+# ─────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = ["venv", "__pycache__", "build", "dist"]
+
+# ─────────────────────────────────────────────
+# Coverage
+# ─────────────────────────────────────────────
+[tool.coverage.run]
+source = ["verifactai"]
+omit = ["verifactai/tests/*", "verifactai/data/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 30
