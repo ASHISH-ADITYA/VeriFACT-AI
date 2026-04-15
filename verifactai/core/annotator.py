@@ -157,7 +157,7 @@ class AnnotatedOutputGenerator:
         no_evidence = sum(1 for c in claims if c.verdict == "NO_EVIDENCE")
         total = len(claims)
 
-        factuality = (supported / total * 100) if total else 0.0
+        factuality = (supported / total * 100) if total else 100.0
 
         claims_data: list[dict[str, Any]] = []
         for c in claims:

@@ -270,6 +270,9 @@ async function scan() {
     const result = await callAnalyzer(convoText);
     if (!result) { setBeacon("idle", "Ready"); return; }
 
+    // No claims = nothing to flag = safe
+    if (result.total_claims === 0) { setBeacon("safe", "Safe"); return; }
+
     const { state, text } = scoreToBeaconState(result.factuality_score || 0);
     setBeacon(state, text);
     pulseTicker(result.alerts || []);

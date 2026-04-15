@@ -27,7 +27,7 @@ class TestJsonReport:
         gen = AnnotatedOutputGenerator()
         result = gen.generate_json("Some text.", [])
         assert result["total_claims"] == 0
-        assert result["factuality_score"] == 0.0
+        assert result["factuality_score"] == 100.0  # no claims = nothing wrong = safe
         assert result["original_text"] == "Some text."
 
     def test_single_supported_claim(self):
