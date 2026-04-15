@@ -161,7 +161,7 @@ class ClaimDecomposer:
     # ------------------------------------------------------------------
     # Fallback: spaCy sentence segmentation + heuristic filter
     # ------------------------------------------------------------------
-    def _fallback_decompose(self, text: str) -> list[Claim]:
+    def _fallback_decompose(self, text: str, max_claims: int = 10) -> list[Claim]:
         doc = self._nlp(text)
         claims: list[Claim] = []
         for idx, sent in enumerate(doc.sents):
@@ -178,6 +178,8 @@ class ClaimDecomposer:
                     char_end=sent.end_char,
                 )
             )
+            if len(claims) >= max_claims:
+                break
         return claims
 
     # ------------------------------------------------------------------
@@ -208,7 +210,19 @@ class ClaimDecomposer:
             return True
         if len(sentence.split()) < 5:
             return True
-        return any(hw in lower for hw in _HEDGE_WORDS)
+        if any(hw in lower for hw in _HEDGE_WORDS):
+            return True
+        # Skip meta-commentary, instructions, and non-factual text
+        skip_starts = [
+            "here are", "here is", "if you", "let me", "i hope",
+            "are you", "do you", "would you", "feel free",
+            "note:", "tip:", "warning:", "important:",
+            "in summary", "to summarize", "in conclusion",
+        ]
+        if any(lower.startswith(s) for s in skip_starts):
+            return True
+        # Skip numbered list headers without factual content
+        return bool(re.match(r"^\d+\.\s+\w+$", sentence.strip()))
 
     @staticmethod
     def _locate_span(original: str, sentence: str) -> tuple[int, int]:

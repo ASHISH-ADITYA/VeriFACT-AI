@@ -135,7 +135,7 @@ async function callAnalyzer(text) {
   const apiToken = store.verifactApiToken || "";
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45000); // 45s timeout
+  const timeout = setTimeout(() => controller.abort(), 90000); // 90s timeout for long responses
 
   try {
     const response = await fetch(apiUrl, {
