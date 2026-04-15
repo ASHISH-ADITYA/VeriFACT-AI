@@ -1,13 +1,14 @@
 /**
- * VeriFACT AI — Browser Extension Content Script
+ * VeriFACT AI — Browser Extension Content Script v2
+ *
+ * Full-conversation scanning with per-message analysis.
+ * Glassmorphism squircle dashboard with claim-level detail.
  *
  * Color spec:
  *   Blue   = safe (90-100% correctness)
  *   Purple = minor hallucinations (70-89%)
  *   Orange = moderate / needs fact check (50-69%)
  *   Red    = hallucinations detected (<50%)
- *
- * Scanning: MutationObserver + debounced fallback polling.
  */
 
 const PLATFORM = location.hostname.includes("claude")
@@ -16,34 +17,34 @@ const PLATFORM = location.hostname.includes("claude")
     ? "gemini"
     : "chatgpt";
 
-const DEBOUNCE_MS = 2000;
-const POLL_FALLBACK_MS = 5000;
-const CONVERSATION_WINDOW = 6;
+const DEBOUNCE_MS = 2500;
+const POLL_FALLBACK_MS = 6000;
+const MAX_TEXT_PER_MSG = 2000;
 
-let lastFingerprint = "";
 let panelVisible = false;
 let panelEl = null;
-let latestTargetNode = null;
 let debounceTimer = null;
-let pulseTimer = null;
+let isAnalyzing = false;
+
+// Store results per message node for full-conversation tracking
+const analyzedMessages = new Map(); // node → result
+let latestResults = []; // ordered list of all results
 
 // ── Beacon creation ──────────────────────────────────
 
 const beacon = document.createElement("button");
 beacon.className = "verifact-beacon idle";
-beacon.title = "VeriFACT AI";
+beacon.title = "VeriFACT AI — Click to open dashboard";
 beacon.innerHTML = '<span class="verifact-beacon-label">VF</span><span class="verifact-beacon-status">Ready</span>';
 document.body.appendChild(beacon);
 
-const ticker = document.createElement("div");
-ticker.className = "verifact-ticker";
-document.body.appendChild(ticker);
-
 beacon.addEventListener("click", () => {
   panelVisible = !panelVisible;
-  if (!panelVisible && panelEl) {
-    panelEl.remove();
-    panelEl = null;
+  if (panelVisible) {
+    renderDashboard();
+  } else if (panelEl) {
+    panelEl.classList.remove("show");
+    setTimeout(() => { if (panelEl && !panelVisible) { panelEl.remove(); panelEl = null; } }, 300);
   }
 });
 
@@ -52,77 +53,39 @@ beacon.addEventListener("click", () => {
 function setBeacon(state, statusText) {
   beacon.className = "verifact-beacon " + state;
   const statusEl = beacon.querySelector(".verifact-beacon-status");
-  if (statusEl && statusText) {
-    statusEl.textContent = statusText;
-  }
+  if (statusEl && statusText) statusEl.textContent = statusText;
 }
 
-function scoreToBeaconState(score) {
-  if (score >= 90) return { state: "safe", text: "Safe" };
-  if (score >= 70) return { state: "minor", text: "Minor" };
-  if (score >= 50) return { state: "moderate", text: "Check" };
+function overallBeaconState() {
+  if (!latestResults.length) return { state: "idle", text: "Ready" };
+
+  const totalClaims = latestResults.reduce((s, r) => s + (r.total_claims || 0), 0);
+  if (totalClaims === 0) return { state: "safe", text: "Safe" };
+
+  const contradicted = latestResults.reduce((s, r) => s + (r.contradicted || 0), 0);
+  const supported = latestResults.reduce((s, r) => s + (r.supported || 0), 0);
+
+  if (contradicted === 0) return { state: "safe", text: "Safe" };
+
+  const ratio = supported / Math.max(totalClaims, 1) * 100;
+  if (ratio >= 90) return { state: "safe", text: "Safe" };
+  if (ratio >= 70) return { state: "minor", text: "Minor" };
+  if (ratio >= 50) return { state: "moderate", text: "Check" };
   return { state: "hallucinated", text: "Alert" };
-}
-
-// ── Alert ticker ─────────────────────────────────────
-
-function alertClass(category) {
-  const c = String(category || "").toLowerCase();
-  if (c.includes("halluc")) return "hallucination";
-  if (c.includes("bias")) return "bias";
-  if (c.includes("red")) return "red-flag";
-  return "neutral";
-}
-
-function pulseTicker(alerts) {
-  if (pulseTimer) { clearTimeout(pulseTimer); pulseTimer = null; }
-
-  if (!alerts || !alerts.length) {
-    ticker.innerHTML = '<div class="verifact-chip neutral">No issues detected.</div>';
-    ticker.classList.add("show");
-    pulseTimer = setTimeout(() => ticker.classList.remove("show"), 3500);
-    return;
-  }
-
-  ticker.innerHTML = alerts.slice(0, 2).map((a) => {
-    const cls = alertClass(a.category);
-    const msg = String(a.message || "Issue detected").replace(/</g, "&lt;");
-    return `<div class="verifact-chip ${cls}">${msg}</div>`;
-  }).join("");
-  ticker.classList.add("show");
-  pulseTimer = setTimeout(() => ticker.classList.remove("show"), 5000);
 }
 
 // ── DOM scanning ─────────────────────────────────────
 
-function getAssistantMessages() {
+function getAssistantMessageNodes() {
+  let nodes = [];
   if (PLATFORM === "chatgpt") {
-    const nodes = Array.from(document.querySelectorAll("[data-message-author-role='assistant']"));
-    const pairs = nodes.map((n) => ({ text: n.innerText?.trim(), node: n })).filter((x) => x.text);
-    latestTargetNode = pairs.length ? pairs[pairs.length - 1].node : null;
-    return pairs.map((p) => p.text);
+    nodes = Array.from(document.querySelectorAll("[data-message-author-role='assistant']"));
+  } else if (PLATFORM === "gemini") {
+    nodes = Array.from(document.querySelectorAll("message-content .markdown, model-response .markdown, model-response"));
+  } else {
+    nodes = Array.from(document.querySelectorAll("div[data-is-streaming], div.prose, div.font-claude-message"));
   }
-
-  if (PLATFORM === "gemini") {
-    const nodes = Array.from(
-      document.querySelectorAll("message-content .markdown, model-response .markdown, model-response")
-    );
-    const pairs = nodes.map((n) => ({ text: n.innerText?.trim(), node: n })).filter((x) => x.text && x.text.length > 40);
-    latestTargetNode = pairs.length ? pairs[pairs.length - 1].node : null;
-    return pairs.map((p) => p.text).slice(-8);
-  }
-
-  // Claude
-  const nodes = Array.from(
-    document.querySelectorAll("div[data-is-streaming], div.prose, div.font-claude-message")
-  );
-  const pairs = nodes.map((n) => ({ text: n.innerText?.trim(), node: n })).filter((x) => x.text && x.text.length > 40).slice(-8);
-  latestTargetNode = pairs.length ? pairs[pairs.length - 1].node : null;
-  return pairs.map((p) => p.text);
-}
-
-function fingerprint(text) {
-  return `${text.length}:${text.slice(0, 80)}:${text.slice(-80)}`;
+  return nodes.filter((n) => n.innerText?.trim().length > 30);
 }
 
 // ── Backend call ─────────────────────────────────────
@@ -134,8 +97,11 @@ async function callAnalyzer(text) {
   const apiUrl = store.verifactApiUrl || "https://adiashish-verifact-ai.hf.space/analyze";
   const apiToken = store.verifactApiToken || "";
 
+  // Truncate very long messages
+  const truncated = text.length > MAX_TEXT_PER_MSG ? text.slice(0, MAX_TEXT_PER_MSG) : text;
+
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90000); // 90s timeout for long responses
+  const timeout = setTimeout(() => controller.abort(), 90000);
 
   try {
     const response = await fetch(apiUrl, {
@@ -146,14 +112,13 @@ async function callAnalyzer(text) {
         ...(apiToken ? { "X-VeriFact-Token": apiToken } : {}),
       },
       body: JSON.stringify({
-        text,
+        text: truncated,
         source: PLATFORM,
         mode: "fast",
         include_claims: true,
-        top_claims: 6,
+        top_claims: 8,
       }),
     });
-
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   } finally {
@@ -161,135 +126,202 @@ async function callAnalyzer(text) {
   }
 }
 
-// ── Claim rendering ──────────────────────────────────
-
-function claimClass(v) {
-  const x = (v || "").toLowerCase();
-  if (x.includes("contrad")) return "contradicted";
-  if (x.includes("support")) return "supported";
-  if (x.includes("unver")) return "unverifiable";
-  return "";
-}
-
-function renderPanel(result) {
-  const panel = ensurePanel();
-  if (!panel) return;
-
-  const claims = (result.flags || []).map((c) => {
-    const confPct = Math.round((c.confidence || 0) * 100);
-    return `
-      <div class="verifact-claim ${claimClass(c.verdict)}">
-        <div><strong>${c.verdict}</strong> (${confPct}%)</div>
-        <div>${(c.claim || "").replace(/</g, "&lt;")}</div>
-        ${c.evidence ? `<div style="margin-top:4px;opacity:0.8;font-size:11px">${String(c.evidence).substring(0, 150).replace(/</g, "&lt;")}...</div>` : ""}
-      </div>`;
-  }).join("");
-
-  panel.innerHTML = `
-    <h3>VeriFACT AI (${PLATFORM})</h3>
-    <div class="verifact-kpi">
-      <div class="verifact-kpi-item">
-        <div class="verifact-kpi-value">${Math.round(result.factuality_score || 0)}</div>
-        <div class="verifact-kpi-label">Score</div>
-      </div>
-      <div class="verifact-kpi-item">
-        <div class="verifact-kpi-value">${Math.round((result.overall_confidence || 0) * 100)}%</div>
-        <div class="verifact-kpi-label">Confidence</div>
-      </div>
-      <div class="verifact-kpi-item">
-        <div class="verifact-kpi-value">${result.total_claims || 0}</div>
-        <div class="verifact-kpi-label">Claims</div>
-      </div>
-    </div>
-    <div style="margin-bottom:8px"><strong>Summary:</strong> ${result.summary || "—"}</div>
-    <hr style="border-color:rgba(255,255,255,0.14)"/>
-    ${claims || "<div>No claims extracted</div>"}
-  `;
-}
-
-function ensurePanel() {
-  if (!panelVisible) return null;
-  if (!panelEl) {
-    panelEl = document.createElement("div");
-    panelEl.className = "verifact-panel";
-    panelEl.innerHTML = "<h3>VeriFACT AI</h3><div>Waiting for response...</div>";
-    document.body.appendChild(panelEl);
-  }
-  return panelEl;
-}
-
 // ── Inline highlighting ──────────────────────────────
 
-function highlightClaims(node, flags) {
-  if (!node || !flags || node.dataset.verifactHighlighted === "1") return;
+function highlightInNode(node, flags) {
+  if (!node || !flags || node.dataset.verifactDone === "1") return;
   const flagged = flags.filter((f) => {
     const v = (f.verdict || "").toLowerCase();
     return v.includes("contrad") || v.includes("unver");
   });
-  if (!flagged.length) return;
+  if (!flagged.length) { node.dataset.verifactDone = "1"; return; }
 
   const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
   const textNodes = [];
-  let current;
-  while ((current = walker.nextNode())) {
-    if (current.nodeValue?.trim()) textNodes.push(current);
+  let cur;
+  while ((cur = walker.nextNode())) {
+    if (cur.nodeValue?.trim()) textNodes.push(cur);
   }
 
   for (const f of flagged) {
     const claim = (f.claim || "").trim();
-    if (claim.length < 16) continue;
-    const probe = claim.slice(0, Math.min(48, claim.length));
+    if (claim.length < 12) continue;
+    const probe = claim.slice(0, Math.min(50, claim.length)).toLowerCase();
     for (const tn of textNodes) {
-      const idx = tn.nodeValue.toLowerCase().indexOf(probe.toLowerCase());
+      const idx = tn.nodeValue.toLowerCase().indexOf(probe);
       if (idx === -1) continue;
       const span = document.createElement("span");
-      span.className = "verifact-inline-flag";
-      span.title = `${f.verdict} (${Math.round((f.confidence || 0) * 100)}%)`;
+      const isContradicted = (f.verdict || "").toLowerCase().includes("contrad");
+      span.className = isContradicted ? "verifact-hl-red" : "verifact-hl-yellow";
+      span.dataset.verifactClaim = claim;
+      span.dataset.verifactVerdict = f.verdict;
+      span.dataset.verifactConf = Math.round((f.confidence || 0) * 100);
+      span.dataset.verifactEvidence = (f.evidence || "").substring(0, 200);
+      span.dataset.verifactSource = f.source || "";
+      span.title = `${f.verdict} (${span.dataset.verifactConf}%) — Click VF for details`;
+
       const full = tn.nodeValue;
       const frag = document.createDocumentFragment();
-      if (full.slice(0, idx)) frag.appendChild(document.createTextNode(full.slice(0, idx)));
+      if (idx > 0) frag.appendChild(document.createTextNode(full.slice(0, idx)));
       span.textContent = full.slice(idx, idx + probe.length);
       frag.appendChild(span);
-      if (full.slice(idx + probe.length)) frag.appendChild(document.createTextNode(full.slice(idx + probe.length)));
+      if (idx + probe.length < full.length) frag.appendChild(document.createTextNode(full.slice(idx + probe.length)));
       tn.parentNode.replaceChild(frag, tn);
-      node.dataset.verifactHighlighted = "1";
       break;
     }
   }
+  node.dataset.verifactDone = "1";
 }
 
-// ── Main scan loop ───────────────────────────────────
+// ── Dashboard rendering (glassmorphism squircle) ─────
+
+function verdictIcon(v) {
+  const l = (v || "").toLowerCase();
+  if (l.includes("contrad")) return '<span class="vf-icon vf-icon-red">!</span>';
+  if (l.includes("support")) return '<span class="vf-icon vf-icon-green">&#10003;</span>';
+  if (l.includes("unver")) return '<span class="vf-icon vf-icon-yellow">?</span>';
+  return '<span class="vf-icon vf-icon-gray">-</span>';
+}
+
+function renderDashboard() {
+  if (!panelEl) {
+    panelEl = document.createElement("div");
+    panelEl.className = "vf-dashboard";
+    document.body.appendChild(panelEl);
+    // Close button
+    panelEl.addEventListener("click", (e) => {
+      if (e.target.classList.contains("vf-close")) {
+        panelVisible = false;
+        panelEl.classList.remove("show");
+        setTimeout(() => { if (panelEl && !panelVisible) { panelEl.remove(); panelEl = null; } }, 300);
+      }
+    });
+  }
+
+  const totalClaims = latestResults.reduce((s, r) => s + (r.total_claims || 0), 0);
+  const supported = latestResults.reduce((s, r) => s + (r.supported || 0), 0);
+  const contradicted = latestResults.reduce((s, r) => s + (r.contradicted || 0), 0);
+  const unverifiable = latestResults.reduce((s, r) => s + (r.unverifiable || 0), 0);
+  const score = totalClaims > 0 ? Math.round(supported / totalClaims * 100) : 100;
+  const allFlags = latestResults.flatMap((r) => r.flags || []);
+
+  const flaggedHtml = allFlags.length ? allFlags.map((f) => {
+    const conf = Math.round((f.confidence || 0) * 100);
+    const ev = (f.evidence || "No evidence available").replace(/</g, "&lt;").substring(0, 250);
+    const src = f.source || "knowledge base";
+    const vClass = (f.verdict || "").toLowerCase().includes("contrad") ? "vf-card-red"
+      : (f.verdict || "").toLowerCase().includes("unver") ? "vf-card-yellow" : "vf-card-green";
+    return `
+      <div class="vf-card ${vClass}">
+        <div class="vf-card-header">
+          ${verdictIcon(f.verdict)}
+          <span class="vf-card-verdict">${f.verdict}</span>
+          <span class="vf-card-conf">${conf}%</span>
+        </div>
+        <div class="vf-card-claim">${(f.claim || "").replace(/</g, "&lt;")}</div>
+        <div class="vf-card-evidence">
+          <span class="vf-card-ev-label">Evidence:</span> ${ev}
+        </div>
+        <div class="vf-card-source">Source: ${src.replace(/</g, "&lt;")}</div>
+      </div>`;
+  }).join("") : '<div class="vf-empty">No issues detected. All claims verified.</div>';
+
+  panelEl.innerHTML = `
+    <div class="vf-dash-inner">
+      <button class="vf-close" title="Close">&times;</button>
+      <div class="vf-dash-header">
+        <div class="vf-logo">VF</div>
+        <div class="vf-title">VeriFACT AI</div>
+        <div class="vf-subtitle">${PLATFORM.charAt(0).toUpperCase() + PLATFORM.slice(1)} Analysis</div>
+      </div>
+      <div class="vf-kpi-row">
+        <div class="vf-kpi">
+          <div class="vf-kpi-val ${score >= 80 ? 'vf-green' : score >= 50 ? 'vf-yellow' : 'vf-red'}">${score}</div>
+          <div class="vf-kpi-lbl">Score</div>
+        </div>
+        <div class="vf-kpi">
+          <div class="vf-kpi-val">${totalClaims}</div>
+          <div class="vf-kpi-lbl">Claims</div>
+        </div>
+        <div class="vf-kpi">
+          <div class="vf-kpi-val vf-green">${supported}</div>
+          <div class="vf-kpi-lbl">Verified</div>
+        </div>
+        <div class="vf-kpi">
+          <div class="vf-kpi-val vf-red">${contradicted}</div>
+          <div class="vf-kpi-lbl">False</div>
+        </div>
+        <div class="vf-kpi">
+          <div class="vf-kpi-val vf-yellow">${unverifiable}</div>
+          <div class="vf-kpi-lbl">Unclear</div>
+        </div>
+      </div>
+      <div class="vf-divider"></div>
+      <div class="vf-section-title">${allFlags.length ? 'Flagged Claims' : 'Conversation Clean'}</div>
+      <div class="vf-cards">${flaggedHtml}</div>
+      <div class="vf-footer">Powered by DeBERTa-v3 NLI + Wikipedia + BM25</div>
+    </div>
+  `;
+
+  requestAnimationFrame(() => panelEl.classList.add("show"));
+}
+
+// ── Main scan loop (per-message) ─────────────────────
 
 async function scan() {
-  const messages = getAssistantMessages();
-  if (!messages.length) return;
+  if (isAnalyzing) return;
+  const msgNodes = getAssistantMessageNodes();
+  if (!msgNodes.length) return;
 
-  const latest = messages[messages.length - 1];
-  if (!latest || latest.length < 40) return;
+  // Find unanalyzed messages
+  const newNodes = msgNodes.filter((n) => !analyzedMessages.has(n));
+  // Also re-check last message if its content changed
+  const lastNode = msgNodes[msgNodes.length - 1];
+  const lastText = lastNode?.innerText?.trim() || "";
+  const lastCached = analyzedMessages.get(lastNode);
+  const lastChanged = lastCached && lastCached._textLen !== lastText.length;
 
-  const convoText = messages.slice(-CONVERSATION_WINDOW).join("\n\n");
-  const fp = fingerprint(convoText);
-  if (fp === lastFingerprint) return;
+  if (!newNodes.length && !lastChanged) return;
 
-  lastFingerprint = fp;
+  isAnalyzing = true;
   setBeacon("analyzing", "Checking...");
 
   try {
-    const result = await callAnalyzer(convoText);
-    if (!result) { setBeacon("idle", "Ready"); return; }
+    // Analyze each new message independently
+    const toAnalyze = lastChanged ? [...newNodes.filter((n) => n !== lastNode), lastNode] : newNodes;
 
-    // No claims = nothing to flag = safe
-    if (result.total_claims === 0) { setBeacon("safe", "Safe"); return; }
+    for (const node of toAnalyze) {
+      const text = node.innerText?.trim();
+      if (!text || text.length < 30) continue;
 
-    const { state, text } = scoreToBeaconState(result.factuality_score || 0);
+      try {
+        const result = await callAnalyzer(text);
+        if (!result) continue;
+        result._textLen = text.length;
+        analyzedMessages.set(node, result);
+        highlightInNode(node, result.flags || []);
+      } catch (err) {
+        if (err.name === "AbortError") {
+          // On timeout, store partial result so we don't re-try immediately
+          analyzedMessages.set(node, { total_claims: 0, flags: [], _textLen: text.length, _timeout: true });
+        }
+      }
+    }
+
+    // Rebuild results list in DOM order
+    latestResults = msgNodes.map((n) => analyzedMessages.get(n)).filter(Boolean);
+
+    // Update beacon state
+    const { state, text } = overallBeaconState();
     setBeacon(state, text);
-    pulseTicker(result.alerts || []);
-    renderPanel(result);
-    highlightClaims(latestTargetNode, result.flags || []);
+
+    // Update dashboard if open
+    if (panelVisible) renderDashboard();
+
   } catch (err) {
-    const isTimeout = err.name === "AbortError";
-    setBeacon("error", isTimeout ? "Timeout" : "Offline");
-    pulseTicker([{ category: "red_flag", message: isTimeout ? "Analysis timed out. Try a shorter response." : "Backend unavailable." }]);
+    setBeacon("error", "Error");
+  } finally {
+    isAnalyzing = false;
   }
 }
 
@@ -298,26 +330,9 @@ function debouncedScan() {
   debounceTimer = setTimeout(() => scan().catch(() => setBeacon("error", "Offline")), DEBOUNCE_MS);
 }
 
-// ── MutationObserver (primary) + polling (fallback) ──
+// ── MutationObserver + polling ───────────────────────
 
 const chatContainer = document.querySelector("main") || document.body;
-const observer = new MutationObserver((mutations) => {
-  // Only trigger if text content changed in the chat area
-  for (const m of mutations) {
-    if (m.type === "childList" || m.type === "characterData") {
-      debouncedScan();
-      return;
-    }
-  }
-});
-
-observer.observe(chatContainer, {
-  childList: true,
-  subtree: true,
-  characterData: true,
-});
-
-// Fallback polling in case MutationObserver misses something
-setInterval(() => {
-  scan().catch(() => setBeacon("error", "Offline"));
-}, POLL_FALLBACK_MS);
+const observer = new MutationObserver(() => debouncedScan());
+observer.observe(chatContainer, { childList: true, subtree: true, characterData: true });
+setInterval(() => scan().catch(() => setBeacon("error", "Offline")), POLL_FALLBACK_MS);

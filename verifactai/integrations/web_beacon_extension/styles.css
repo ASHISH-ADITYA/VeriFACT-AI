@@ -1,281 +1,367 @@
-/* VeriFACT AI — Beacon Extension Styles
-   Color spec:
-     Blue   = safe (90-100% correctness)
-     Purple = minor hallucinations (70-89%)
-     Orange = moderate / needs fact check (50-69%)
-     Red    = hallucinations detected (<50%)
+/* VeriFACT AI — Glassmorphism Squircle Dashboard
+   Translucent frost-glass theme with squircle cards.
 */
 
 /* ── Beacon ──────────────────────────────────────────── */
 
 .verifact-beacon {
   position: fixed;
-  right: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 58px;
-  height: 58px;
-  border-radius: 999px;
-  border: 2px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  right: 20px;
+  bottom: 28px;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255,255,255,0.2);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 2147483646;
   cursor: pointer;
-  backdrop-filter: blur(8px);
-  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
   font-size: 11px;
   font-weight: 700;
   color: #fff;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
   letter-spacing: 0.02em;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .verifact-beacon:hover {
-  transform: translateY(calc(-50% - 2px)) scale(1.04);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+  transform: scale(1.08);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255,255,255,0.25);
 }
 
-.verifact-beacon-label {
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1;
-}
+.verifact-beacon:active { transform: scale(0.95); }
 
+.verifact-beacon-label { font-size: 15px; font-weight: 800; line-height: 1; }
 .verifact-beacon-status {
-  font-size: 8px;
-  font-weight: 600;
-  opacity: 0.9;
+  font-size: 7px; font-weight: 600; opacity: 0.9;
+  text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2px;
+}
+
+/* ── Beacon States ───────────────────────────────────── */
+
+.verifact-beacon.idle       { background: linear-gradient(135deg, rgba(59,130,246,0.8), rgba(37,99,235,0.95)); }
+.verifact-beacon.analyzing  { background: linear-gradient(135deg, rgba(139,92,246,0.8), rgba(109,40,217,0.95)); animation: vfPulse 1.5s infinite; }
+.verifact-beacon.safe       { background: linear-gradient(135deg, rgba(34,197,94,0.8), rgba(22,163,74,0.95)); }
+.verifact-beacon.minor      { background: linear-gradient(135deg, rgba(168,85,247,0.8), rgba(126,34,206,0.95)); }
+.verifact-beacon.moderate   { background: linear-gradient(135deg, rgba(251,146,60,0.8), rgba(234,88,12,0.95)); }
+.verifact-beacon.hallucinated { background: linear-gradient(135deg, rgba(239,68,68,0.8), rgba(185,28,28,0.95)); animation: vfPulse 1s infinite; }
+.verifact-beacon.error      { background: linear-gradient(135deg, rgba(107,114,128,0.8), rgba(75,85,99,0.95)); }
+
+@keyframes vfPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(139,92,246,0.5); }
+  70%  { box-shadow: 0 0 0 14px rgba(139,92,246,0); }
+  100% { box-shadow: 0 0 0 0 rgba(139,92,246,0); }
+}
+
+.verifact-beacon.hallucinated { animation-name: vfPulseRed; }
+@keyframes vfPulseRed {
+  0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+  70%  { box-shadow: 0 0 0 14px rgba(239,68,68,0); }
+  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+}
+
+/* ── Glow ring ───────────────────────────────────────── */
+
+.verifact-beacon::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 18px;
+  background: conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.15) 25%, transparent 50%, rgba(255,255,255,0.1) 75%, transparent 100%);
+  animation: vfGlow 3s linear infinite;
+  pointer-events: none;
+}
+@keyframes vfGlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ── Dashboard (glassmorphism squircle) ──────────────── */
+
+.vf-dashboard {
+  position: fixed;
+  right: 20px;
+  bottom: 96px;
+  width: 380px;
+  max-height: 75vh;
+  z-index: 2147483646;
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+}
+
+.vf-dashboard.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.vf-dash-inner {
+  position: relative;
+  border-radius: 24px;
+  overflow: hidden;
+  max-height: 75vh;
+  overflow-y: auto;
+  padding: 24px 20px 16px;
+  background: rgba(15, 15, 25, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: #f0f0f5;
+}
+
+/* Scrollbar styling */
+.vf-dash-inner::-webkit-scrollbar { width: 4px; }
+.vf-dash-inner::-webkit-scrollbar-track { background: transparent; }
+.vf-dash-inner::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+/* ── Close button ────────────────────────────────────── */
+
+.vf-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.7);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  line-height: 1;
+  padding: 0;
+}
+.vf-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+/* ── Header ──────────────────────────────────────────── */
+
+.vf-dash-header { text-align: center; margin-bottom: 18px; }
+
+.vf-logo {
+  display: inline-flex;
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 16px rgba(99,102,241,0.4);
+}
+
+.vf-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.vf-subtitle {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-top: 2px;
 }
 
-/* ── Beacon States ───────────────────────────────────── */
+/* ── KPI Row ─────────────────────────────────────────── */
 
-/* Idle — waiting for content */
-.verifact-beacon.idle {
-  background: radial-gradient(circle at 30% 30%, #7eb8f0, #2563eb);
-}
-
-/* Analyzing — processing */
-.verifact-beacon.analyzing {
-  background: radial-gradient(circle at 30% 30%, #c4b5fd, #7c3aed);
-  animation: verifactPulse 1.4s infinite;
-}
-
-/* Safe — 90-100% correctness (BLUE) */
-.verifact-beacon.safe {
-  background: radial-gradient(circle at 30% 30%, #60a5fa, #1d4ed8);
-}
-
-/* Minor — 70-89% correctness (PURPLE) */
-.verifact-beacon.minor {
-  background: radial-gradient(circle at 30% 30%, #c4b5fd, #7c3aed);
-}
-
-/* Moderate — 50-69% correctness (ORANGE) */
-.verifact-beacon.moderate {
-  background: radial-gradient(circle at 30% 30%, #fdba74, #ea580c);
-}
-
-/* Hallucinated — <50% correctness (RED) */
-.verifact-beacon.hallucinated {
-  background: radial-gradient(circle at 30% 30%, #fca5a5, #dc2626);
-}
-
-/* Error — backend unreachable */
-.verifact-beacon.error {
-  background: radial-gradient(circle at 30% 30%, #9ca3af, #4b5563);
-}
-
-/* ── Mist / Smoke Effect (Siri-style glow) ───────────── */
-
-.verifact-beacon::before {
-  content: '';
-  position: absolute;
-  inset: -6px;
-  border-radius: 999px;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.12) 15%,
-    transparent 30%,
-    rgba(255, 255, 255, 0.08) 50%,
-    transparent 65%,
-    rgba(255, 255, 255, 0.10) 80%,
-    transparent 100%
-  );
-  animation: verifactMist 4s linear infinite;
-  pointer-events: none;
-}
-
-.verifact-beacon.safe::before {
-  background: conic-gradient(
-    from 0deg,
-    transparent 0%,
-    rgba(96, 165, 250, 0.2) 15%,
-    transparent 30%,
-    rgba(29, 78, 216, 0.15) 50%,
-    transparent 65%,
-    rgba(96, 165, 250, 0.18) 80%,
-    transparent 100%
-  );
-}
-
-.verifact-beacon.minor::before {
-  background: conic-gradient(
-    from 0deg,
-    transparent 0%,
-    rgba(196, 181, 253, 0.22) 15%,
-    transparent 30%,
-    rgba(124, 58, 237, 0.15) 50%,
-    transparent 65%,
-    rgba(196, 181, 253, 0.18) 80%,
-    transparent 100%
-  );
-}
-
-.verifact-beacon.moderate::before {
-  background: conic-gradient(
-    from 0deg,
-    transparent 0%,
-    rgba(253, 186, 116, 0.22) 15%,
-    transparent 30%,
-    rgba(234, 88, 12, 0.15) 50%,
-    transparent 65%,
-    rgba(253, 186, 116, 0.18) 80%,
-    transparent 100%
-  );
-}
-
-.verifact-beacon.hallucinated::before {
-  background: conic-gradient(
-    from 0deg,
-    transparent 0%,
-    rgba(252, 165, 165, 0.25) 15%,
-    transparent 30%,
-    rgba(220, 38, 38, 0.18) 50%,
-    transparent 65%,
-    rgba(252, 165, 165, 0.2) 80%,
-    transparent 100%
-  );
-}
-
-@keyframes verifactMist {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-
-@keyframes verifactPulse {
-  0%  { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.4); }
-  70% { box-shadow: 0 0 0 16px rgba(124, 58, 237, 0); }
-  100%{ box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
-}
-
-/* ── Ticker (alert chips) ────────────────────────────── */
-
-.verifact-ticker {
-  position: fixed;
-  right: 14px;
-  top: calc(50% + 44px);
-  width: 252px;
+.vf-kpi-row {
   display: flex;
-  flex-direction: column;
-  gap: 7px;
-  z-index: 2147483646;
-  opacity: 0;
-  transform: translateY(6px);
-  pointer-events: none;
-  transition: opacity 0.22s ease, transform 0.22s ease;
-}
-
-.verifact-ticker.show { opacity: 1; transform: translateY(0); }
-
-.verifact-chip {
-  border-radius: 18px;
-  padding: 10px 12px;
-  font-size: 12px;
-  line-height: 1.25;
-  color: #f5f7fb;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: linear-gradient(145deg, rgba(255,255,255,0.2), rgba(255,255,255,0.08));
-  backdrop-filter: blur(14px) saturate(130%);
-  -webkit-backdrop-filter: blur(14px) saturate(130%);
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.3);
-}
-
-.verifact-chip.hallucination {
-  border-color: rgba(255, 147, 147, 0.7);
-  background: linear-gradient(145deg, rgba(221, 62, 62, 0.4), rgba(98, 16, 16, 0.35));
-}
-
-.verifact-chip.bias {
-  border-color: rgba(255, 215, 146, 0.7);
-  background: linear-gradient(145deg, rgba(204, 136, 30, 0.38), rgba(105, 70, 16, 0.33));
-}
-
-.verifact-chip.red-flag {
-  border-color: rgba(255, 186, 121, 0.72);
-  background: linear-gradient(145deg, rgba(220, 92, 35, 0.35), rgba(112, 48, 20, 0.35));
-}
-
-/* ── Panel ───────────────────────────────────────────── */
-
-.verifact-panel {
-  position: fixed;
-  right: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 340px;
-  max-height: 60vh;
-  overflow: auto;
-  padding: 14px;
-  border-radius: 14px;
-  background: rgba(17, 24, 39, 0.92);
-  color: #f9fafb;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.4);
-  z-index: 2147483646;
-  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-.verifact-panel h3 { margin: 0 0 8px; font-size: 15px; }
-
-.verifact-kpi {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
+  margin-bottom: 16px;
+}
+
+.vf-kpi {
+  flex: 1;
+  text-align: center;
+  padding: 10px 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vf-kpi-val {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.vf-kpi-lbl {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.45);
+  margin-top: 3px;
+}
+
+.vf-green { color: #4ade80 !important; }
+.vf-yellow { color: #fbbf24 !important; }
+.vf-red { color: #f87171 !important; }
+
+/* ── Divider ─────────────────────────────────────────── */
+
+.vf-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  margin: 4px 0 14px;
+}
+
+/* ── Section title ───────────────────────────────────── */
+
+.vf-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.5);
   margin-bottom: 10px;
 }
 
-.verifact-kpi-item {
+/* ── Claim Cards (squircle glass) ────────────────────── */
+
+.vf-cards { display: flex; flex-direction: column; gap: 8px; }
+
+.vf-card {
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
+}
+
+.vf-card:hover {
   background: rgba(255, 255, 255, 0.08);
-  padding: 8px;
-  border-radius: 10px;
-  text-align: center;
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
-.verifact-kpi-value { font-size: 16px; font-weight: 700; }
-.verifact-kpi-label { font-size: 11px; opacity: 0.85; }
+.vf-card-red    { border-left: 3px solid #ef4444; }
+.vf-card-yellow { border-left: 3px solid #f59e0b; }
+.vf-card-green  { border-left: 3px solid #22c55e; }
 
-.verifact-claim {
-  border-left: 3px solid #374151;
-  padding: 8px;
+.vf-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
 }
 
-.verifact-claim.contradicted { border-left-color: #ef4444; }
-.verifact-claim.unverifiable { border-left-color: #f59e0b; }
-.verifact-claim.supported    { border-left-color: #22c55e; }
-
-.verifact-inline-flag {
-  background: rgba(220, 38, 38, 0.22);
-  border-bottom: 2px solid rgba(239, 68, 68, 0.85);
-  border-radius: 4px;
-  padding: 0 2px;
+.vf-icon {
+  display: inline-flex;
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
 }
+
+.vf-icon-red    { background: rgba(239,68,68,0.2); color: #f87171; }
+.vf-icon-green  { background: rgba(34,197,94,0.2); color: #4ade80; }
+.vf-icon-yellow { background: rgba(245,158,11,0.2); color: #fbbf24; }
+.vf-icon-gray   { background: rgba(156,163,175,0.2); color: #9ca3af; }
+
+.vf-card-verdict {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.vf-card-conf {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+.vf-card-claim {
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255,255,255,0.9);
+  margin-bottom: 8px;
+}
+
+.vf-card-evidence {
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255,255,255,0.55);
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  margin-bottom: 6px;
+}
+
+.vf-card-ev-label {
+  font-weight: 600;
+  color: rgba(255,255,255,0.7);
+}
+
+.vf-card-source {
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  font-style: italic;
+}
+
+/* ── Empty state ─────────────────────────────────────── */
+
+.vf-empty {
+  text-align: center;
+  padding: 24px 16px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.45);
+  border-radius: 14px;
+  background: rgba(34,197,94,0.06);
+  border: 1px solid rgba(34,197,94,0.12);
+}
+
+/* ── Footer ──────────────────────────────────────────── */
+
+.vf-footer {
+  text-align: center;
+  font-size: 9px;
+  color: rgba(255,255,255,0.25);
+  margin-top: 14px;
+  letter-spacing: 0.02em;
+}
+
+/* ── Inline highlights (in chatbot text) ─────────────── */
+
+.verifact-hl-red {
+  background: rgba(239, 68, 68, 0.15);
+  border-bottom: 2px solid rgba(239, 68, 68, 0.7);
+  border-radius: 3px;
+  padding: 1px 3px;
+  cursor: help;
+  transition: background 0.15s ease;
+}
+.verifact-hl-red:hover { background: rgba(239, 68, 68, 0.25); }
+
+.verifact-hl-yellow {
+  background: rgba(245, 158, 11, 0.12);
+  border-bottom: 2px solid rgba(245, 158, 11, 0.6);
+  border-radius: 3px;
+  padding: 1px 3px;
+  cursor: help;
+  transition: background 0.15s ease;
+}
+.verifact-hl-yellow:hover { background: rgba(245, 158, 11, 0.22); }
