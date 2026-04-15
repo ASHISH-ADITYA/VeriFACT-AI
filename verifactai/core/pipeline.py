@@ -90,17 +90,44 @@ class VeriFactPipeline:
         claims = self.decomposer.decompose(text)
         logger.info(f"Stage 1 complete: {len(claims)} claims extracted")
 
-        # Stage 2 — Evidence Retrieval (batch)
-        claim_texts = [c.text for c in claims]
-        evidence_batches = self.retriever.batch_retrieve(claim_texts)
-        for claim, evidence in zip(claims, evidence_batches, strict=False):
-            claim.evidence = evidence
-        logger.info("Stage 2 complete: evidence retrieved")
+        # Stage 2a — Fast rule-check pass (instant, catches obvious contradictions)
+        from core.evidence_retriever import Evidence
+        from core.fact_rules import check_rules
 
-        # Stage 3 — NLI Verdict + Confidence (batched across all claims)
-        claims_with_evidence = [(claim, claim.evidence) for claim in claims]
-        verdicts = self.verdict_engine.batch_judge(claims_with_evidence)
-        for claim, verdict in zip(claims, verdicts, strict=False):
+        rule_resolved = set()
+        for claim in claims:
+            rule = check_rules(claim.text)
+            if rule:
+                logger.info(f"Rule fast-pass [{rule.rule_name}]: {claim.text[:50]} → CONTRADICTED")
+                claim.evidence = [Evidence(
+                    text=rule.correct_fact, source="factual_rule",
+                    title=f"Rule: {rule.rule_name}", url="", similarity=1.0, chunk_id=-1,
+                )]
+                claim.verdict = "CONTRADICTED"
+                claim.confidence = 0.95
+                claim.uncertainty = 0.05
+                claim.stability = 0.95
+                claim.best_evidence = claim.evidence[0]
+                claim.nli_scores = {"rule_override": True, "rule_name": rule.rule_name, "rule_reason": rule.reason}
+                claim.all_nli_results = []
+                rule_resolved.add(claim.id)
+
+        # Stage 2b — Evidence Retrieval (only for unresolved claims)
+        unresolved = [c for c in claims if c.id not in rule_resolved]
+        if unresolved:
+            unresolved_texts = [c.text for c in unresolved]
+            evidence_batches = self.retriever.batch_retrieve(unresolved_texts)
+            for claim, evidence in zip(unresolved, evidence_batches, strict=False):
+                claim.evidence = evidence
+        logger.info(f"Stage 2 complete: {len(rule_resolved)} ruled, {len(unresolved)} need NLI")
+
+        # Stage 3 — NLI Verdict (only for unresolved claims, batched)
+        if unresolved:
+            claims_with_evidence = [(claim, claim.evidence) for claim in unresolved]
+            verdicts = self.verdict_engine.batch_judge(claims_with_evidence)
+        else:
+            verdicts = []
+        for claim, verdict in zip(unresolved, verdicts, strict=False):
             claim.verdict = verdict.label
             claim.confidence = verdict.confidence
             claim.uncertainty = verdict.uncertainty
@@ -190,19 +217,50 @@ class VeriFactPipeline:
         for idx, claim in enumerate(claims):
             yield {"event": "claim", "data": {"claim": claim.text, "index": idx, "total": total}}
 
-        # Stage 2 — Evidence Retrieval (batch)
-        yield {"event": "status", "data": {"stage": "retrieving", "message": "Retrieving evidence..."}}
-        claim_texts = [c.text for c in claims]
-        evidence_batches = self.retriever.batch_retrieve(claim_texts)
-        for claim, evidence in zip(claims, evidence_batches, strict=False):
-            claim.evidence = evidence
-        logger.info("Stage 2 complete: evidence retrieved")
+        # Stage 2a — Fast rule-check pass
+        from core.evidence_retriever import Evidence
+        from core.fact_rules import check_rules
 
-        # Stage 3 — NLI Verdict + Confidence (batched across all claims)
-        yield {"event": "status", "data": {"stage": "judging", "message": "Assigning verdicts..."}}
-        claims_with_evidence = [(claim, claim.evidence) for claim in claims]
-        verdicts = self.verdict_engine.batch_judge(claims_with_evidence)
-        for claim, verdict in zip(claims, verdicts, strict=False):
+        rule_resolved = set()
+        for claim in claims:
+            rule = check_rules(claim.text)
+            if rule:
+                claim.evidence = [Evidence(
+                    text=rule.correct_fact, source="factual_rule",
+                    title=f"Rule: {rule.rule_name}", url="", similarity=1.0, chunk_id=-1,
+                )]
+                claim.verdict = "CONTRADICTED"
+                claim.confidence = 0.95
+                claim.uncertainty = 0.05
+                claim.stability = 0.95
+                claim.best_evidence = claim.evidence[0]
+                claim.nli_scores = {"rule_override": True, "rule_name": rule.rule_name}
+                claim.all_nli_results = []
+                rule_resolved.add(claim.id)
+                yield {
+                    "event": "verdict",
+                    "data": {"claim": claim.text, "verdict": "CONTRADICTED", "confidence": 0.95,
+                             "evidence": rule.correct_fact},
+                }
+
+        # Stage 2b — Evidence Retrieval (only unresolved)
+        unresolved = [c for c in claims if c.id not in rule_resolved]
+        if unresolved:
+            yield {"event": "status", "data": {"stage": "retrieving", "message": f"Retrieving evidence for {len(unresolved)} claims..."}}
+            unresolved_texts = [c.text for c in unresolved]
+            evidence_batches = self.retriever.batch_retrieve(unresolved_texts)
+            for claim, evidence in zip(unresolved, evidence_batches, strict=False):
+                claim.evidence = evidence
+        logger.info(f"Stage 2 complete: {len(rule_resolved)} ruled, {len(unresolved)} need NLI")
+
+        # Stage 3 — NLI Verdict (only unresolved, batched)
+        if unresolved:
+            yield {"event": "status", "data": {"stage": "judging", "message": "Assigning verdicts..."}}
+            claims_with_evidence = [(claim, claim.evidence) for claim in unresolved]
+            verdicts = self.verdict_engine.batch_judge(claims_with_evidence)
+        else:
+            verdicts = []
+        for claim, verdict in zip(unresolved, verdicts, strict=False):
             claim.verdict = verdict.label
             claim.confidence = verdict.confidence
             claim.uncertainty = verdict.uncertainty

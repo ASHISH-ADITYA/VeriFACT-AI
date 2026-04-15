@@ -161,26 +161,62 @@ class ClaimDecomposer:
     # ------------------------------------------------------------------
     # Fallback: spaCy sentence segmentation + heuristic filter
     # ------------------------------------------------------------------
-    def _fallback_decompose(self, text: str, max_claims: int = 10) -> list[Claim]:
+    def _fallback_decompose(self, text: str, max_claims: int = 20) -> list[Claim]:
         doc = self._nlp(text)
-        claims: list[Claim] = []
+        candidates: list[tuple[float, Claim]] = []
         for idx, sent in enumerate(doc.sents):
             s = sent.text.strip()
             if self._should_skip(s):
                 continue
-            claims.append(
-                Claim(
-                    id=f"c-{idx}",
-                    text=s,
-                    source_sentence=s,
-                    claim_type="entity_fact",
-                    char_start=sent.start_char,
-                    char_end=sent.end_char,
-                )
+            claim = Claim(
+                id=f"c-{idx}",
+                text=s,
+                source_sentence=s,
+                claim_type=self._infer_type(s),
+                char_start=sent.start_char,
+                char_end=sent.end_char,
             )
-            if len(claims) >= max_claims:
-                break
+            # Rank by fact-density: sentences with numbers, dates, names score higher
+            score = self._fact_density(s)
+            candidates.append((score, claim))
+
+        # Sort by fact-density descending, take top N
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        claims = [c for _, c in candidates[:max_claims]]
+        # Re-sort by position in text for natural order
+        claims.sort(key=lambda c: c.char_start)
         return claims
+
+    @staticmethod
+    def _fact_density(sentence: str) -> float:
+        """Score how likely a sentence contains verifiable facts. Higher = more factual."""
+        s = 1.0  # base score
+        lower = sentence.lower()
+        # Numbers, dates, measurements boost score
+        if re.search(r"\d", sentence):
+            s += 2.0
+        # Named entities (capitalized words not at sentence start)
+        caps = re.findall(r"(?<!^)(?<!\. )[A-Z][a-z]+", sentence)
+        s += len(caps) * 0.5
+        # Specific factual keywords
+        fact_words = ["is", "was", "are", "were", "located", "founded", "invented", "discovered",
+                      "born", "died", "built", "capital", "population", "contains", "consists"]
+        s += sum(0.5 for w in fact_words if w in lower)
+        # Longer sentences with more content
+        s += min(len(sentence.split()) / 20.0, 1.0)
+        return s
+
+    @staticmethod
+    def _infer_type(sentence: str) -> str:
+        """Infer claim type from sentence content."""
+        lower = sentence.lower()
+        if re.search(r"\b\d{4}\b|century|year|era|period|age", lower):
+            return "temporal"
+        if re.search(r"\b\d+\.?\d*\s*(percent|%|km|miles|meters|kg|pounds|degrees|million|billion)", lower):
+            return "numerical"
+        if any(w in lower for w in ["cause", "because", "result", "lead to", "due to"]):
+            return "causal"
+        return "entity_fact"
 
     # ------------------------------------------------------------------
     # Helpers
