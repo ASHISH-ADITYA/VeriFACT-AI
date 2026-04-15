@@ -21,6 +21,7 @@ from urllib.parse import urlsplit
 from config import Config
 from core.hallucination_discriminator import HallucinationDiscriminator
 from core.pipeline import VeriFactPipeline
+from core.prompt_optimizer import PromptOptimizer
 from core.risk_classifier import RiskClassifier
 from utils.runtime_safety import apply_runtime_safety_defaults
 
@@ -31,6 +32,7 @@ _PIPELINE: VeriFactPipeline | None = None
 _PIPELINE_LOCK = threading.Lock()
 _RISK_CLASSIFIER: RiskClassifier | None = None
 _DISCRIMINATOR: HallucinationDiscriminator | None = None
+_OPTIMIZER: PromptOptimizer | None = None
 _API_TOKEN = os.environ.get("VERIFACT_API_TOKEN", "").strip()
 _ENV = os.environ.get("VERIFACT_ENV", "development").strip().lower()
 
@@ -117,6 +119,19 @@ def get_risk_classifier() -> RiskClassifier | None:
     if _RISK_CLASSIFIER is None:
         _RISK_CLASSIFIER = RiskClassifier()
     return _RISK_CLASSIFIER
+
+
+def get_optimizer() -> PromptOptimizer:
+    global _OPTIMIZER
+    if _OPTIMIZER is None:
+        cfg = Config()
+        llm_client = None
+        if cfg.llm.provider != "none":
+            from core.llm_client import LLMClient
+
+            llm_client = LLMClient(cfg.llm)
+        _OPTIMIZER = PromptOptimizer(llm_client=llm_client, provider=cfg.llm.provider)
+    return _OPTIMIZER
 
 
 def get_discriminator() -> HallucinationDiscriminator | None:
@@ -467,9 +482,39 @@ class OverlayHandler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
+    def _handle_optimize(self) -> None:
+        """POST /optimize -- suggest an improved version of a user prompt."""
+        if not self._validate_request():
+            return
+
+        payload = self._read_json_body()
+        if payload is None:
+            return
+
+        prompt = (payload.get("prompt") or "").strip()
+        if not prompt:
+            self._json_response(400, {"error": "prompt is required"})
+            return
+
+        max_prompt = 10_000
+        if len(prompt) > max_prompt:
+            self._json_response(400, {"error": f"Prompt too long (max {max_prompt} chars)"})
+            return
+
+        try:
+            optimizer = get_optimizer()
+            result = optimizer.optimize(prompt)
+            self._json_response(200, result.to_dict())
+        except Exception as exc:
+            self._json_response(500, {"error": str(exc)})
+
     def do_POST(self) -> None:  # noqa: N802
         if self.path == "/analyze/stream":
             self._handle_analyze_stream()
+            return
+
+        if self.path == "/optimize":
+            self._handle_optimize()
             return
 
         if self.path != "/analyze":

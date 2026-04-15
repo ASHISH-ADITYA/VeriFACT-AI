@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -125,17 +126,73 @@ class EvidenceRetriever:
             logger.warning(f"Reranker init failed ({exc}) — skipping reranking")
 
     # ------------------------------------------------------------------
+    # Contradiction-aware query expansion
+    # ------------------------------------------------------------------
+    _STOPWORDS = frozenset({
+        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did", "will", "would", "shall",
+        "should", "may", "might", "must", "can", "could", "of", "in", "to",
+        "for", "with", "on", "at", "from", "by", "about", "as", "into",
+        "through", "during", "before", "after", "above", "below", "between",
+        "out", "off", "over", "under", "again", "further", "then", "once",
+        "that", "this", "these", "those", "it", "its", "not", "no", "nor",
+        "but", "or", "and", "if", "than", "too", "very", "just", "so",
+    })
+
+    def _expand_queries(self, claim: str) -> list[str]:
+        """Generate expanded queries including a negation-oriented query.
+
+        For a claim like "The Great Wall is in South America", produces:
+        1. The original claim (always first)
+        2. A negation query built from key content words, stripping
+           potentially false location/attribute words and adding likely
+           correct ones (e.g. "Great Wall China location Asia")
+
+        This helps retrieve contradicting evidence that the original
+        query embedding would miss.
+        """
+        queries = [claim]
+
+        # Extract content words (nouns, proper nouns, key terms)
+        words = re.findall(r"[A-Za-z]+(?:'[A-Za-z]+)?", claim)
+        content_words = [
+            w for w in words if w.lower() not in self._STOPWORDS and len(w) > 1
+        ]
+
+        if len(content_words) < 2:
+            return queries
+
+        # Build negation query: keep entity words, add "location origin facts"
+        # to nudge retrieval toward factual context rather than the claim's assertion
+        negation_query = " ".join(content_words) + " facts origin location history"
+        queries.append(negation_query)
+
+        return queries
+
+    # ------------------------------------------------------------------
     @timed
     def retrieve(self, claim_text: str, top_k: int | None = None) -> list[Evidence]:
-        """Hybrid retrieve: dense + BM25 + rerank."""
+        """Hybrid retrieve with contradiction-aware query expansion: dense + BM25 + rerank."""
         if self.index is None:
             return []
         k = top_k or self.config.retrieval.top_k
         # Fetch moderate candidates — too many makes reranking slow on CPU
         fetch_k = max(k * 3, 10)
 
-        candidates = self._hybrid_fetch(claim_text, fetch_k)
-        reranked = self._rerank(claim_text, candidates, k)
+        # Expand queries for contradiction-aware retrieval
+        queries = self._expand_queries(claim_text)
+
+        # Collect candidates from all expanded queries
+        seen_chunk_ids: set[int] = set()
+        all_candidates: list[Evidence] = []
+        for query in queries:
+            candidates = self._hybrid_fetch(query, fetch_k)
+            for ev in candidates:
+                if ev.chunk_id not in seen_chunk_ids:
+                    seen_chunk_ids.add(ev.chunk_id)
+                    all_candidates.append(ev)
+
+        reranked = self._rerank(claim_text, all_candidates, k)
         return reranked
 
     @timed

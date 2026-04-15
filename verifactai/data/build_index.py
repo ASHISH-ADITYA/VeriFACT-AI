@@ -35,6 +35,15 @@ from config import cfg  # noqa: E402
 configure_faiss_threads()
 
 
+def _split_sentences(text: str) -> list[str]:
+    """Split text into sentences using basic punctuation rules."""
+    import re
+
+    # Split on sentence-ending punctuation followed by whitespace
+    raw = re.split(r'(?<=[.!?])\s+', text.strip())
+    return [s.strip() for s in raw if s.strip()]
+
+
 def chunk_text(
     text: str,
     title: str,
@@ -44,23 +53,176 @@ def chunk_text(
     overlap: int = 50,
     min_words: int = 30,
 ) -> list[dict]:
-    """Split text into overlapping word-level chunks with metadata."""
-    words = text.split()
+    """Semantic paragraph-aware chunking with sentence-boundary splitting.
+
+    Strategy:
+    1. Split on paragraph breaks (double newline).
+    2. Merge short paragraphs (< 50 words) with the next one.
+    3. Split long paragraphs (> 300 words) at sentence boundaries.
+    4. Target chunk size: 100-250 words.
+    5. Overlap: last 2 sentences of previous chunk prepended to next.
+    """
+    # ── Step 1: split into paragraphs ──
+    raw_paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+
+    # ── Step 2: merge short paragraphs (< 50 words) ──
+    merged: list[str] = []
+    buffer = ""
+    for para in raw_paragraphs:
+        if buffer:
+            buffer = buffer + " " + para
+        else:
+            buffer = para
+        if len(buffer.split()) >= 50:
+            merged.append(buffer)
+            buffer = ""
+    if buffer:
+        if merged:
+            merged[-1] = merged[-1] + " " + buffer
+        else:
+            merged.append(buffer)
+
+    # ── Step 3: split long paragraphs at sentence boundaries (target 100-250 words) ──
+    segments: list[str] = []
+    for para in merged:
+        word_count = len(para.split())
+        if word_count <= 300:
+            segments.append(para)
+        else:
+            # Split at sentence boundaries into ~100-250 word chunks
+            sentences = _split_sentences(para)
+            current: list[str] = []
+            current_wc = 0
+            for sent in sentences:
+                sent_wc = len(sent.split())
+                if current_wc + sent_wc > 250 and current_wc >= 100:
+                    segments.append(" ".join(current))
+                    current = [sent]
+                    current_wc = sent_wc
+                else:
+                    current.append(sent)
+                    current_wc += sent_wc
+            if current:
+                # If leftover is too small, merge with previous segment
+                if current_wc < min_words and segments:
+                    segments[-1] = segments[-1] + " " + " ".join(current)
+                else:
+                    segments.append(" ".join(current))
+
+    # ── Step 4: build chunks with 2-sentence overlap ──
     chunks: list[dict] = []
-    step = max(chunk_size - overlap, 1)
-    for i in range(0, len(words), step):
-        chunk_words = words[i : i + chunk_size]
-        if len(chunk_words) < min_words:
+    prev_last_two_sentences: list[str] = []
+    for seg in segments:
+        seg_words = seg.split()
+        if len(seg_words) < min_words:
             continue
+        # Prepend overlap from previous chunk
+        if prev_last_two_sentences:
+            overlap_text = " ".join(prev_last_two_sentences)
+            chunk_text_final = overlap_text + " " + seg
+        else:
+            chunk_text_final = seg
+        # Trim if overlap pushed it too far beyond 250 words
+        final_words = chunk_text_final.split()
+        if len(final_words) > 300:
+            chunk_text_final = " ".join(final_words[:300])
         chunks.append(
             {
-                "text": " ".join(chunk_words),
+                "text": chunk_text_final,
                 "source": source,
                 "title": title,
                 "url": url,
             }
         )
+        # Track last 2 sentences for next overlap
+        sentences = _split_sentences(seg)
+        prev_last_two_sentences = sentences[-2:] if len(sentences) >= 2 else sentences
+
+    # Fallback: if semantic chunking produced nothing (e.g. no paragraph breaks),
+    # use simple word-level chunking
+    if not chunks and len(text.split()) >= min_words:
+        words = text.split()
+        step = max(chunk_size - overlap, 1)
+        for i in range(0, len(words), step):
+            chunk_words = words[i : i + chunk_size]
+            if len(chunk_words) < min_words:
+                continue
+            chunks.append(
+                {
+                    "text": " ".join(chunk_words),
+                    "source": source,
+                    "title": title,
+                    "url": url,
+                }
+            )
     return chunks
+
+
+def _ensure_topic_diversity(wiki_dataset, existing_titles: set[str], max_extra: int = 500) -> list[dict]:
+    """Fetch specific articles for underrepresented topics if missing from random sample.
+
+    Checks coverage across key topic categories and fetches targeted articles
+    to fill gaps. Returns a list of article dicts (title, text) to add.
+    """
+    # Key topics that should be represented for good fact-checking coverage
+    topic_seeds: dict[str, list[str]] = {
+        "countries": [
+            "United States", "China", "India", "Brazil", "Russia", "Japan",
+            "Germany", "France", "United Kingdom", "Australia", "Canada",
+            "Mexico", "South Africa", "Egypt", "Nigeria", "Indonesia",
+            "South Korea", "Italy", "Spain", "Argentina",
+        ],
+        "capitals": [
+            "Washington, D.C.", "Beijing", "New Delhi", "Tokyo", "Berlin",
+            "Paris", "London", "Canberra", "Ottawa", "Moscow",
+            "Brasília", "Cairo", "Rome", "Madrid", "Buenos Aires",
+        ],
+        "famous_people": [
+            "Albert Einstein", "Isaac Newton", "Marie Curie", "Charles Darwin",
+            "Mahatma Gandhi", "Nelson Mandela", "Martin Luther King Jr.",
+            "Leonardo da Vinci", "William Shakespeare", "Cleopatra",
+            "Alexander the Great", "Napoleon", "Abraham Lincoln",
+            "Nikola Tesla", "Ada Lovelace",
+        ],
+        "scientific_facts": [
+            "Speed of light", "DNA", "Evolution", "Gravity", "Atom",
+            "Solar System", "Photosynthesis", "Vaccine", "Periodic table",
+            "Climate change", "Cell (biology)", "Virus", "Antibiotic",
+            "Quantum mechanics", "Theory of relativity",
+        ],
+        "historical_events": [
+            "World War I", "World War II", "French Revolution",
+            "American Revolution", "Industrial Revolution", "Cold War",
+            "Moon landing", "Fall of the Berlin Wall", "Renaissance",
+            "Ancient Rome", "Ancient Egypt", "Ancient Greece",
+            "Printing press", "Declaration of Independence",
+        ],
+    }
+
+    existing_lower = {t.lower() for t in existing_titles}
+    missing: list[str] = []
+    for _category, titles in topic_seeds.items():
+        for title in titles:
+            if title.lower() not in existing_lower:
+                missing.append(title)
+
+    if not missing:
+        print("       Topic diversity: all key topics already covered")
+        return []
+
+    print(f"       Topic diversity: {len(missing)} key articles missing, searching dataset …")
+
+    # Build a lookup from the full dataset by title
+    title_to_article: dict[str, dict] = {}
+    for article in wiki_dataset:
+        t = article["title"]
+        if t.lower() in {m.lower() for m in missing}:
+            title_to_article[t.lower()] = {"title": article["title"], "text": article["text"]}
+
+    extra_articles = list(title_to_article.values())[:max_extra]
+    found = len(extra_articles)
+    print(f"       Topic diversity: found {found}/{len(missing)} missing key articles in dataset")
+    return extra_articles
 
 
 def load_wikipedia(max_articles: int | None = None) -> list[dict]:
@@ -99,11 +261,35 @@ def load_wikipedia(max_articles: int | None = None) -> list[dict]:
             "  3. Check network connection and retry"
         )
     if max_articles:
-        wiki = wiki.select(range(min(max_articles, len(wiki))))
-    print(f"       {len(wiki):,} articles loaded")
+        wiki_subset = wiki.select(range(min(max_articles, len(wiki))))
+    else:
+        wiki_subset = wiki
+    print(f"       {len(wiki_subset):,} articles loaded")
 
+    # Track titles for diversity check
+    indexed_titles: set[str] = set()
     all_chunks: list[dict] = []
-    for article in tqdm(wiki, desc="Chunking Wikipedia"):
+    for article in tqdm(wiki_subset, desc="Chunking Wikipedia"):
+        title = article["title"]
+        text = article["text"]
+        if not text or len(text.split()) < 30:
+            continue
+        indexed_titles.add(title)
+        url = f"https://simple.wikipedia.org/wiki/{title.replace(' ', '_')}"
+        all_chunks.extend(
+            chunk_text(
+                text,
+                title,
+                "wikipedia",
+                url,
+                cfg.retrieval.chunk_size,
+                cfg.retrieval.chunk_overlap,
+            )
+        )
+
+    # ── Topic diversity: fill gaps for key articles ──
+    extra_articles = _ensure_topic_diversity(wiki, indexed_titles)
+    for article in extra_articles:
         title = article["title"]
         text = article["text"]
         if not text or len(text.split()) < 30:
@@ -119,6 +305,7 @@ def load_wikipedia(max_articles: int | None = None) -> list[dict]:
                 cfg.retrieval.chunk_overlap,
             )
         )
+
     print(f"       {len(all_chunks):,} Wikipedia chunks created")
     return all_chunks
 

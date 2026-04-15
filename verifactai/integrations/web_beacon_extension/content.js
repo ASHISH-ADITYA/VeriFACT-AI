@@ -378,6 +378,95 @@ function renderDashboard() {
   requestAnimationFrame(() => panelEl.classList.add("show"));
 }
 
+// ── Prompt Optimizer (real-time suggestions) ─────────
+
+let promptTip = null;
+let promptTimer = null;
+let lastPromptText = "";
+
+function getInputElement() {
+  if (PLATFORM === "chatgpt") return document.querySelector("#prompt-textarea, textarea[data-id]");
+  if (PLATFORM === "gemini") return document.querySelector("rich-textarea .ql-editor, textarea, div[contenteditable='true']");
+  return document.querySelector("div[contenteditable='true'], textarea");
+}
+
+async function optimizePrompt(text) {
+  const store = await chrome.storage.local.get(["verifactApiUrl"]);
+  const base = (store.verifactApiUrl || "https://adiashish-verifact-ai.hf.space").replace("/analyze", "");
+  try {
+    const res = await fetch(base + "/optimize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: text }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch { return null; }
+}
+
+function showPromptTip(data) {
+  if (!data || !data.improvements || !data.improvements.length) { hidePromptTip(); return; }
+  if (!promptTip) {
+    promptTip = document.createElement("div");
+    promptTip.className = "vf-prompt-tip";
+    document.body.appendChild(promptTip);
+  }
+
+  const inputEl = getInputElement();
+  if (inputEl) {
+    const r = inputEl.getBoundingClientRect();
+    promptTip.style.left = r.left + "px";
+    promptTip.style.bottom = (innerHeight - r.top + 8) + "px";
+  }
+
+  const improvHtml = data.improvements.map((i) => `<div class="vf-pt-item">${i.replace(/</g, "&lt;")}</div>`).join("");
+  promptTip.innerHTML = `
+    <div class="vf-pt-header">
+      <span class="vf-pt-logo">VF</span>
+      <span class="vf-pt-title">Prompt Suggestions</span>
+      <span class="vf-pt-score">${data.score || 0}/100</span>
+    </div>
+    ${improvHtml}
+    ${data.suggested ? `<div class="vf-pt-suggested"><strong>Try:</strong> ${data.suggested.replace(/</g, "&lt;").substring(0, 200)}</div>` : ""}
+  `;
+  promptTip.classList.add("show");
+}
+
+function hidePromptTip() {
+  if (promptTip) promptTip.classList.remove("show");
+}
+
+function watchPromptInput() {
+  const inputEl = getInputElement();
+  if (!inputEl) return;
+
+  const handler = () => {
+    const text = (inputEl.innerText || inputEl.value || "").trim();
+    if (text === lastPromptText || text.length < 15) { hidePromptTip(); return; }
+    lastPromptText = text;
+
+    if (promptTimer) clearTimeout(promptTimer);
+    promptTimer = setTimeout(async () => {
+      const data = await optimizePrompt(text);
+      if (data) showPromptTip(data);
+    }, 3000); // 3s debounce after user stops typing
+  };
+
+  inputEl.addEventListener("input", handler);
+  inputEl.addEventListener("keyup", handler);
+  // Re-watch when DOM changes (new chat, page navigation)
+  new MutationObserver(() => {
+    const newInput = getInputElement();
+    if (newInput && newInput !== inputEl) {
+      newInput.addEventListener("input", handler);
+      newInput.addEventListener("keyup", handler);
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+}
+
+// Start prompt watching after page loads
+setTimeout(watchPromptInput, 2000);
+
 // ── Observer + polling ───────────────────────────────
 
 function debouncedScan() {

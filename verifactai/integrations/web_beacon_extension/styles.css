@@ -365,3 +365,88 @@
   -webkit-box-decoration-break: clone;
 }
 .verifact-hl-yellow:hover { background: rgba(245, 158, 11, 0.4); }
+
+/* ── Prompt Suggestion Tooltip ───────────────────────── */
+
+.vf-prompt-tip {
+  position: fixed;
+  left: 50%;
+  bottom: 80px;
+  width: 420px;
+  max-width: 90vw;
+  z-index: 2147483645;
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(15, 15, 30, 0.82);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  backdrop-filter: blur(30px) saturate(160%);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255,255,255,0.05);
+  color: #e8e8f0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  font-size: 12px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.vf-prompt-tip.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.vf-pt-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.vf-pt-logo {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.vf-pt-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.85);
+}
+
+.vf-pt-score {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: #a78bfa;
+}
+
+.vf-pt-item {
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  border-radius: 10px;
+  background: rgba(139, 92, 246, 0.08);
+  border-left: 2px solid rgba(139, 92, 246, 0.4);
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255,255,255,0.75);
+}
+
+.vf-pt-suggested {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255,255,255,0.8);
+}
