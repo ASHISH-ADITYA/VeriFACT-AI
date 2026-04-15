@@ -3,7 +3,7 @@
 VeriFACT AI — Production Startup Script.
 
 Ensures FAISS index exists, then starts the API server.
-If no index found, builds a small one (1000 articles, ~2 min).
+If no index found, builds one (2500 articles, ~12 min on free CPU).
 """
 
 from __future__ import annotations
@@ -31,8 +31,8 @@ def main() -> None:
         print("  This takes ~2-3 minutes on first deploy.")
         print("=" * 50)
 
-        # Build index — 5000 articles gives good coverage for common facts
-        max_articles = int(os.environ.get("VERIFACT_INDEX_SIZE", "5000"))
+        # Build index — 2500 articles balances coverage vs free-tier build time (~12 min)
+        max_articles = int(os.environ.get("VERIFACT_INDEX_SIZE", "2500"))
 
         from data.build_index import build_and_save, load_wikipedia
 
