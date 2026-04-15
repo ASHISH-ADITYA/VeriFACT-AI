@@ -85,8 +85,6 @@
 
 .vf-dashboard {
   position: fixed;
-  right: 20px;
-  bottom: 96px;
   width: 380px;
   max-height: 75vh;
   z-index: 2147483646;

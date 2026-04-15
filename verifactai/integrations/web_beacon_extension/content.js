@@ -34,11 +34,51 @@ let latestResults = []; // ordered list of all results
 
 const beacon = document.createElement("button");
 beacon.className = "verifact-beacon idle";
-beacon.title = "VeriFACT AI — Click to open dashboard";
+beacon.title = "VeriFACT AI — Drag to move, click to open dashboard";
 beacon.innerHTML = '<span class="verifact-beacon-label">VF</span><span class="verifact-beacon-status">Ready</span>';
 document.body.appendChild(beacon);
 
-beacon.addEventListener("click", () => {
+// ── Draggable beacon ────────────────────────────────
+let isDragging = false;
+let dragStartX = 0, dragStartY = 0;
+let beaconStartX = 0, beaconStartY = 0;
+let hasMoved = false;
+
+beacon.addEventListener("mousedown", (e) => {
+  isDragging = true;
+  hasMoved = false;
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  const rect = beacon.getBoundingClientRect();
+  beaconStartX = rect.left;
+  beaconStartY = rect.top;
+  beacon.style.transition = "none";
+  e.preventDefault();
+});
+
+document.addEventListener("mousemove", (e) => {
+  if (!isDragging) return;
+  const dx = e.clientX - dragStartX;
+  const dy = e.clientY - dragStartY;
+  if (Math.abs(dx) > 4 || Math.abs(dy) > 4) hasMoved = true;
+  if (!hasMoved) return;
+
+  const newX = Math.max(0, Math.min(window.innerWidth - 60, beaconStartX + dx));
+  const newY = Math.max(0, Math.min(window.innerHeight - 60, beaconStartY + dy));
+  beacon.style.left = newX + "px";
+  beacon.style.top = newY + "px";
+  beacon.style.right = "auto";
+  beacon.style.bottom = "auto";
+});
+
+document.addEventListener("mouseup", () => {
+  if (!isDragging) return;
+  isDragging = false;
+  beacon.style.transition = "";
+});
+
+beacon.addEventListener("click", (e) => {
+  if (hasMoved) { e.preventDefault(); return; } // was a drag, not a click
   panelVisible = !panelVisible;
   if (panelVisible) {
     renderDashboard();
@@ -188,7 +228,6 @@ function renderDashboard() {
     panelEl = document.createElement("div");
     panelEl.className = "vf-dashboard";
     document.body.appendChild(panelEl);
-    // Close button
     panelEl.addEventListener("click", (e) => {
       if (e.target.classList.contains("vf-close")) {
         panelVisible = false;
@@ -197,6 +236,20 @@ function renderDashboard() {
       }
     });
   }
+
+  // Position dashboard near beacon
+  const br = beacon.getBoundingClientRect();
+  const dw = 380, maxH = window.innerHeight * 0.75;
+  let left = br.left - dw - 12;
+  if (left < 8) left = br.right + 12;
+  if (left + dw > window.innerWidth - 8) left = window.innerWidth - dw - 8;
+  let top = br.top - maxH / 2 + 28;
+  if (top < 8) top = 8;
+  if (top + maxH > window.innerHeight - 8) top = window.innerHeight - maxH - 8;
+  panelEl.style.left = left + "px";
+  panelEl.style.top = top + "px";
+  panelEl.style.right = "auto";
+  panelEl.style.bottom = "auto";
 
   const totalClaims = latestResults.reduce((s, r) => s + (r.total_claims || 0), 0);
   const supported = latestResults.reduce((s, r) => s + (r.supported || 0), 0);
