@@ -35,6 +35,11 @@ class LLMClient:
     # ------------------------------------------------------------------
     def _init_providers(self) -> None:
         """Initialise all available providers (primary first)."""
+        # "none" = spaCy-only mode (no LLM), used on HF Space free tier
+        if self._primary_provider == "none":
+            logger.info("LLM provider set to 'none' — using spaCy-only decomposition")
+            return
+
         # Always try primary
         self._try_init(self._primary_provider)
 
