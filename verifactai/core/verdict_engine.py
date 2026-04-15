@@ -130,6 +130,18 @@ class VerdictEngine:
         # Step 1 — run NLI for each (evidence, claim) pair
         nli_results = self._batch_nli(claim.text, evidence_list)
 
+        # Step 1b — contradiction-aware evidence mining
+        # Track best support AND best contradiction evidence separately.
+        # This ensures we never discard strong contradiction signal just
+        # because support evidence has higher similarity.
+        best_contra_nli = max(nli_results, key=lambda r: r.contradiction)
+
+        # If best contradiction evidence is strong (>0.50) AND its similarity
+        # is reasonable (>0.30), this is a real contradiction signal — not noise.
+        has_real_contradiction_evidence = (
+            best_contra_nli.contradiction > 0.50 and best_contra_nli.evidence.similarity > 0.30
+        )
+
         # Step 2 — aggregate with specificity gate
         #
         # Key insight: NLI models often give high entailment for
@@ -180,6 +192,13 @@ class VerdictEngine:
             # Only SUPPORTED if evidence is both relevant AND entailing
             label = "SUPPORTED"
             best_ev = best_support.evidence
+        elif has_real_contradiction_evidence:
+            # Step 3b — contradiction-aware fallback
+            # Don't default to UNVERIFIABLE if we have real contradiction evidence.
+            # This catches cases where support evidence is weak but contradiction
+            # evidence exists — the claim is more likely wrong than unknown.
+            label = "CONTRADICTED"
+            best_ev = best_contra_nli.evidence
         else:
             label = "UNVERIFIABLE"
             best_ev = best_support.evidence
