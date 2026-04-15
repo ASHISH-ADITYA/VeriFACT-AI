@@ -91,7 +91,14 @@ class EvidenceRetriever:
         self._init_reranker()
 
     def _init_bm25(self) -> None:
-        """Build BM25 index from metadata texts."""
+        """Build BM25 index from metadata texts (skip if corpus too large for interactive use)."""
+        if os.environ.get("VERIFACT_DISABLE_BM25", "0") == "1":
+            logger.info("BM25 disabled via VERIFACT_DISABLE_BM25")
+            return
+        # BM25 on 300K+ docs is too slow for interactive — skip unless corpus is small
+        if len(self.metadata) > 50_000:
+            logger.info(f"BM25 skipped: corpus too large ({len(self.metadata):,}) for interactive speed. Use FAISS-only.")
+            return
         try:
             from rank_bm25 import BM25Okapi
 
@@ -106,6 +113,9 @@ class EvidenceRetriever:
 
     def _init_reranker(self) -> None:
         """Load cross-encoder reranker for evidence quality improvement."""
+        if os.environ.get("VERIFACT_DISABLE_RERANKER", "0") == "1":
+            logger.info("Reranker disabled via VERIFACT_DISABLE_RERANKER")
+            return
         try:
             from sentence_transformers import CrossEncoder
 
@@ -124,8 +134,8 @@ class EvidenceRetriever:
         if self.index is None:
             return []
         k = top_k or self.config.retrieval.top_k
-        # Fetch more candidates for fusion, then rerank down to k
-        fetch_k = max(k * 5, 20)
+        # Fetch moderate candidates — too many makes reranking slow on CPU
+        fetch_k = max(k * 3, 10)
 
         candidates = self._hybrid_fetch(claim_text, fetch_k)
         reranked = self._rerank(claim_text, candidates, k)

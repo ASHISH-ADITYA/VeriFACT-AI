@@ -130,6 +130,7 @@ async function callAnalyzer(text) {
     body: JSON.stringify({
       text,
       source: PLATFORM,
+      mode: "fast",
       include_claims: true,
       top_claims: 6
     })

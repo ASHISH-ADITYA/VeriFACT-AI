@@ -74,10 +74,12 @@ class VeriFactPipeline:
         logger.info("VeriFactPipeline ready")
 
     # ------------------------------------------------------------------
-    @timed
-    def verify_text(self, text: str) -> VerificationResult:
-        """Verify pre-existing text (mode: paste LLM output)."""
-        cache_key = md5_hash(text)
+    def _verify_text_impl(self, text: str, fast_mode: bool = False) -> VerificationResult:
+        """Verify pre-existing text (mode: paste LLM output).
+
+        fast_mode skips expensive refinement loops for extension-first latency.
+        """
+        cache_key = f"{'fast' if fast_mode else 'full'}:{md5_hash(text)}"
         if cache_key in self._cache:
             logger.info("Cache hit — returning cached result")
             return self._cache[cache_key]
@@ -106,7 +108,7 @@ class VeriFactPipeline:
             claim.nli_scores = verdict.nli_scores
             claim.all_nli_results = verdict.all_nli
 
-            selfcheck = self.selfcheck.score_claim(claim.text, claim.evidence)
+            selfcheck = None if fast_mode else self.selfcheck.score_claim(claim.text, claim.evidence)
             if selfcheck:
                 blend = min(max(self.config.selfcheck.confidence_blend_weight, 0.0), 1.0)
                 claim.confidence = round(
@@ -135,7 +137,8 @@ class VeriFactPipeline:
         logger.info("Stage 3 complete: verdicts assigned")
 
         # Stage 4 — Corrections for contradicted claims
-        self.annotator.generate_corrections(claims)
+        if not fast_mode:
+            self.annotator.generate_corrections(claims)
 
         # Stage 5 — Annotated output
         annotated_html = self.annotator.generate_html(text, claims)
@@ -161,6 +164,16 @@ class VeriFactPipeline:
 
         self._cache[cache_key] = result
         return result
+
+    # ------------------------------------------------------------------
+    @timed
+    def verify_text(self, text: str, fast_mode: bool = False) -> VerificationResult:
+        """Public verification API.
+
+        Args:
+            fast_mode: Skip expensive refinement stages for lower-latency requests.
+        """
+        return self._verify_text_impl(text, fast_mode=fast_mode)
 
     # ------------------------------------------------------------------
     @timed

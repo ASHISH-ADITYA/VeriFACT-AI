@@ -42,6 +42,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 
 _REQUIRE_AUTH = _env_bool("VERIFACT_REQUIRE_AUTH", _ENV in {"production", "prod"})
+_EXTENSION_FAST_MODE = _env_bool("VERIFACT_EXTENSION_FAST", True)
 _ENABLE_RISK_CLASSIFIER = os.environ.get("VERIFACT_ENABLE_RISK_CLASSIFIER", "1") == "1"
 _ENABLE_DISCRIMINATOR = os.environ.get("VERIFACT_ENABLE_DISCRIMINATOR", "0") == "1"
 _DISCRIMINATOR_PATH = os.environ.get(
@@ -136,6 +137,18 @@ def summarize(result: Any) -> str:
         f"{result.supported} supported, {result.contradicted} contradicted, "
         f"{result.unverifiable} unverifiable, {result.no_evidence} without evidence."
     )
+
+
+def _is_fast_mode(payload: dict[str, Any]) -> bool:
+    explicit_mode = str(payload.get("mode") or payload.get("profile") or "").strip().lower()
+    if explicit_mode in {"fast", "interactive", "extension"}:
+        return True
+
+    if payload.get("fast_mode") is True:
+        return True
+
+    source = str(payload.get("source") or "").strip().lower()
+    return _EXTENSION_FAST_MODE and source in {"chatgpt", "claude", "gemini"}
 
 
 _BIAS_CUE_WORDS = {
@@ -382,8 +395,9 @@ class OverlayHandler(BaseHTTPRequestHandler):
                 return
 
             top_claims = min(int(payload.get("top_claims", 6)), 20)  # Cap at 20
+            fast_mode = _is_fast_mode(payload)
             pipeline = get_pipeline()
-            result = pipeline.verify_text(text)
+            result = pipeline.verify_text(text, fast_mode=fast_mode)
             self._json_response(200, result_payload(result, top_claims=top_claims))
         except json.JSONDecodeError:
             self._json_response(400, {"error": "Invalid JSON body"})
