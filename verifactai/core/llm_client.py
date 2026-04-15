@@ -102,6 +102,10 @@ class LLMClient:
         temp = temperature if temperature is not None else self.config.temperature
         tokens = max_tokens if max_tokens is not None else self.config.max_tokens
 
+        # No LLM available — skip silently (spaCy-only mode)
+        if self._primary_provider == "none":
+            return None
+
         if strict:
             return self._call_strict(user=user, system=system, temperature=temp, max_tokens=tokens)
         return self._call_with_fallback(
