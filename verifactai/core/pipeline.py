@@ -166,6 +166,118 @@ class VeriFactPipeline:
         return result
 
     # ------------------------------------------------------------------
+    def verify_text_streaming(self, text: str, fast_mode: bool = False):
+        """Generator that yields intermediate progress dicts during verification.
+
+        Yields dicts with an ``event`` key (status | claim | verdict | complete).
+        The final yield is always ``complete`` with the full VerificationResult.
+        """
+        cache_key = f"{'fast' if fast_mode else 'full'}:{md5_hash(text)}"
+        if cache_key in self._cache:
+            cached = self._cache[cache_key]
+            yield {"event": "complete", "data": cached}
+            return
+
+        start = time.perf_counter()
+
+        # Stage 1 — Claim Decomposition
+        yield {"event": "status", "data": {"stage": "decomposing", "message": "Extracting claims..."}}
+        claims = self.decomposer.decompose(text)
+        logger.info(f"Stage 1 complete: {len(claims)} claims extracted")
+
+        total = len(claims)
+        for idx, claim in enumerate(claims):
+            yield {"event": "claim", "data": {"claim": claim.text, "index": idx, "total": total}}
+
+        # Stage 2 — Evidence Retrieval (batch)
+        yield {"event": "status", "data": {"stage": "retrieving", "message": "Retrieving evidence..."}}
+        claim_texts = [c.text for c in claims]
+        evidence_batches = self.retriever.batch_retrieve(claim_texts)
+        for claim, evidence in zip(claims, evidence_batches, strict=False):
+            claim.evidence = evidence
+        logger.info("Stage 2 complete: evidence retrieved")
+
+        # Stage 3 — NLI Verdict + Confidence
+        yield {"event": "status", "data": {"stage": "judging", "message": "Assigning verdicts..."}}
+        for claim in claims:
+            verdict = self.verdict_engine.judge(claim, claim.evidence)
+            claim.verdict = verdict.label
+            claim.confidence = verdict.confidence
+            claim.uncertainty = verdict.uncertainty
+            claim.stability = verdict.stability
+            claim.best_evidence = verdict.best_evidence
+            claim.nli_scores = verdict.nli_scores
+            claim.all_nli_results = verdict.all_nli
+
+            selfcheck = None if fast_mode else self.selfcheck.score_claim(claim.text, claim.evidence)
+            if selfcheck:
+                blend = min(max(self.config.selfcheck.confidence_blend_weight, 0.0), 1.0)
+                claim.confidence = round(
+                    (1.0 - blend) * float(claim.confidence)
+                    + blend * float(selfcheck["consistency"]),
+                    4,
+                )
+                claim.uncertainty = round(
+                    (float(claim.uncertainty) + float(selfcheck["uncertainty"])) / 2.0,
+                    4,
+                )
+                claim.stability = round(1.0 - float(claim.uncertainty), 4)
+                if claim.nli_scores is None:
+                    claim.nli_scores = {}
+                claim.nli_scores.update(
+                    {
+                        "selfcheck_consistency": selfcheck["consistency"],
+                        "selfcheck_entropy": selfcheck["entropy"],
+                        "selfcheck_disagreement": selfcheck["disagreement"],
+                        "selfcheck_semantic_cluster_entropy": selfcheck["semantic_cluster_entropy"],
+                        "selfcheck_distribution": selfcheck["distribution"],
+                        "selfcheck_majority_label": selfcheck["majority_label"],
+                        "selfcheck_valid_samples": selfcheck["valid_samples"],
+                    }
+                )
+
+            yield {
+                "event": "verdict",
+                "data": {
+                    "claim": claim.text,
+                    "verdict": claim.verdict,
+                    "confidence": float(claim.confidence or 0.0),
+                    "evidence": (claim.best_evidence.text[:220] if claim.best_evidence else ""),
+                },
+            }
+        logger.info("Stage 3 complete: verdicts assigned")
+
+        # Stage 4 — Corrections for contradicted claims
+        if not fast_mode:
+            self.annotator.generate_corrections(claims)
+
+        # Stage 5 — Annotated output
+        yield {"event": "status", "data": {"stage": "annotating", "message": "Generating report..."}}
+        annotated_html = self.annotator.generate_html(text, claims)
+        report_json = self.annotator.generate_json(text, claims)
+        logger.info("Stage 4–5 complete: output annotated")
+
+        elapsed = time.perf_counter() - start
+
+        result = VerificationResult(
+            original_text=text,
+            llm_query=None,
+            claims=claims,
+            annotated_html=annotated_html,
+            report_json=report_json,
+            factuality_score=report_json["factuality_score"],
+            total_claims=report_json["total_claims"],
+            supported=report_json["supported"],
+            contradicted=report_json["contradicted"],
+            unverifiable=report_json["unverifiable"],
+            no_evidence=report_json["no_evidence"],
+            processing_time=round(elapsed, 2),
+        )
+
+        self._cache[cache_key] = result
+        yield {"event": "complete", "data": result}
+
+    # ------------------------------------------------------------------
     @timed
     def verify_text(self, text: str, fast_mode: bool = False) -> VerificationResult:
         """Public verification API.

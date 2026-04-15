@@ -6,6 +6,7 @@ Local HTTP endpoint used by the browser beacon extension.
 Runs on 127.0.0.1:8765 and exposes:
   - GET /health
   - POST /analyze
+  - POST /analyze/stream  (SSE streaming)
 """
 
 from __future__ import annotations
@@ -44,7 +45,7 @@ def _env_bool(name: str, default: bool) -> bool:
 _REQUIRE_AUTH = _env_bool("VERIFACT_REQUIRE_AUTH", _ENV in {"production", "prod"})
 _EXTENSION_FAST_MODE = _env_bool("VERIFACT_EXTENSION_FAST", True)
 _ENABLE_RISK_CLASSIFIER = os.environ.get("VERIFACT_ENABLE_RISK_CLASSIFIER", "1") == "1"
-_ENABLE_DISCRIMINATOR = os.environ.get("VERIFACT_ENABLE_DISCRIMINATOR", "0") == "1"
+_ENABLE_DISCRIMINATOR = os.environ.get("VERIFACT_ENABLE_DISCRIMINATOR", "1") == "1"
 _DISCRIMINATOR_PATH = os.environ.get(
     "VERIFACT_DISCRIMINATOR_PATH", "assets/models/hallucination_discriminator.joblib"
 )
@@ -344,7 +345,133 @@ class OverlayHandler(BaseHTTPRequestHandler):
             return
         self._json_response(200, {"ok": True, "service": "verifact-overlay"})
 
+    def _cors_origin(self) -> str:
+        """Return the CORS origin header value for the current request."""
+        request_origin = (self.headers.get("Origin") or "").strip()
+        normalized = _normalized_origin(request_origin)
+        if normalized and normalized in _ALLOWED_ORIGINS:
+            return normalized
+        return "*"
+
+    def _sse_response_start(self) -> None:
+        """Send SSE response headers (chunked, text/event-stream)."""
+        origin = self._cors_origin()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache, no-store")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Transfer-Encoding", "chunked")
+        # CORS
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-VeriFact-Token")
+        # Security headers
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.end_headers()
+
+    def _send_sse_event(self, event: str, data: str) -> None:
+        """Write one SSE event using chunked transfer encoding."""
+        payload = f"event: {event}\ndata: {data}\n\n"
+        chunk_bytes = payload.encode("utf-8")
+        chunk = f"{len(chunk_bytes):x}\r\n".encode() + chunk_bytes + b"\r\n"
+        self.wfile.write(chunk)
+        self.wfile.flush()
+
+    def _send_chunk_end(self) -> None:
+        """Write the terminating zero-length chunk."""
+        self.wfile.write(b"0\r\n\r\n")
+        self.wfile.flush()
+
+    def _read_json_body(self) -> dict[str, Any] | None:
+        """Read and parse JSON body. Returns None on error (response already sent)."""
+        content_length = int(self.headers.get("Content-Length", "0"))
+        max_body = 100_000
+        if content_length > max_body:
+            self._json_response(413, {"error": f"Request too large (max {max_body} bytes)"})
+            return None
+        raw = self.rfile.read(content_length)
+        try:
+            return json.loads(raw.decode("utf-8")) if raw else {}
+        except json.JSONDecodeError:
+            self._json_response(400, {"error": "Invalid JSON body"})
+            return None
+
+    def _validate_request(self) -> bool:
+        """Run shared auth / origin / rate-limit checks. Returns True if OK."""
+        if not self._is_allowed_origin():
+            self._json_response(403, {"error": "origin_not_allowed"})
+            return False
+        if not self._is_authorized():
+            if _REQUIRE_AUTH and not _API_TOKEN:
+                self._json_response(
+                    503,
+                    {
+                        "error": "server_misconfigured",
+                        "message": (
+                            "VERIFACT_REQUIRE_AUTH is enabled but VERIFACT_API_TOKEN is empty"
+                        ),
+                    },
+                )
+                return False
+            self._json_response(401, {"error": "unauthorized"})
+            return False
+        client_ip = self.client_address[0]
+        if not _check_rate_limit(client_ip):
+            self._json_response(429, {"error": "rate_limited", "retry_after_seconds": 60})
+            return False
+        return True
+
+    def _handle_analyze_stream(self) -> None:
+        """POST /analyze/stream -- SSE streaming endpoint."""
+        if not self._validate_request():
+            return
+
+        payload = self._read_json_body()
+        if payload is None:
+            return
+
+        text = (payload.get("text") or "").strip()
+        if not text:
+            self._json_response(400, {"error": "text is required"})
+            return
+
+        max_text = 50_000
+        if len(text) > max_text:
+            self._json_response(400, {"error": f"Text too long (max {max_text} chars)"})
+            return
+
+        top_claims = min(int(payload.get("top_claims", 6)), 20)
+        fast_mode = _is_fast_mode(payload)
+
+        try:
+            pipeline = get_pipeline()
+            self._sse_response_start()
+
+            for msg in pipeline.verify_text_streaming(text, fast_mode=fast_mode):
+                event = msg["event"]
+                if event == "complete":
+                    result = msg["data"]
+                    final = result_payload(result, top_claims=top_claims)
+                    self._send_sse_event("complete", json.dumps(final))
+                else:
+                    self._send_sse_event(event, json.dumps(msg["data"]))
+
+            self._send_chunk_end()
+        except Exception as exc:
+            try:
+                self._send_sse_event("error", json.dumps({"error": str(exc)}))
+                self._send_chunk_end()
+            except Exception:
+                pass
+
     def do_POST(self) -> None:  # noqa: N802
+        if self.path == "/analyze/stream":
+            self._handle_analyze_stream()
+            return
+
         if self.path != "/analyze":
             self._json_response(404, {"error": "not_found"})
             return

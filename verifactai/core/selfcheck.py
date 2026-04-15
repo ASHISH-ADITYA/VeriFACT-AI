@@ -47,10 +47,19 @@ class SelfCheckScorer:
         self.config = config
 
     def score_claim(self, claim_text: str, evidence: list[Evidence]) -> dict | None:
-        """Return self-check metrics, or None when unavailable."""
+        """Return self-check metrics, or None when unavailable.
+
+        When no LLM is available (e.g. LLM_PROVIDER=none on HF Space),
+        falls back to NLI-based consistency: runs NLI on each
+        (evidence_i, claim) pair and computes cross-evidence agreement
+        as a proxy for self-check uncertainty.
+        """
         sc = self.config.selfcheck
-        if not sc.enabled or self.llm is None or not evidence:
+        if not sc.enabled or not evidence:
             return None
+
+        if self.llm is None:
+            return self._nli_fallback(claim_text, evidence)
 
         evidence_block = self._build_evidence_block(evidence[: max(sc.max_evidence, 1)])
         labels: list[str] = []
@@ -91,6 +100,66 @@ class SelfCheckScorer:
         denom = max(ew + dw + sw, 1e-8)
 
         uncertainty = (ew * entropy + dw * disagreement + sw * semantic_entropy) / denom
+        uncertainty = min(max(uncertainty, 0.0), 1.0)
+        stability = 1.0 - uncertainty
+
+        return {
+            "majority_label": majority_label,
+            "consistency": round(consistency, 4),
+            "entropy": round(entropy, 4),
+            "disagreement": round(disagreement, 4),
+            "semantic_cluster_entropy": round(semantic_entropy, 4),
+            "uncertainty": round(uncertainty, 4),
+            "stability": round(stability, 4),
+            "distribution": label_distribution(labels, _CLASSES),
+            "valid_samples": len(labels),
+        }
+
+    def _nli_fallback(self, claim_text: str, evidence: list[Evidence]) -> dict | None:
+        """NLI-based SelfCheck: run NLI on each (evidence_i, claim) pair
+        and compute consistency across results as a self-check proxy.
+
+        This gives uncertainty estimation WITHOUT needing an LLM.
+        """
+        from core.verdict_engine import VerdictEngine
+
+        sc = self.config.selfcheck
+
+        # Lazily initialise a shared VerdictEngine (heavy model load)
+        if not hasattr(self, "_verdict_engine"):
+            self._verdict_engine = VerdictEngine(self.config)
+
+        nli_results = self._verdict_engine._batch_nli(claim_text, evidence)
+        if not nli_results:
+            return None
+
+        # Map each NLI result to a label
+        labels: list[str] = []
+        for r in nli_results:
+            if r.entailment > r.contradiction and r.entailment > r.neutral:
+                labels.append("supported")
+            elif r.contradiction > r.entailment and r.contradiction > r.neutral:
+                labels.append("contradicted")
+            else:
+                labels.append("uncertain")
+
+        if len(labels) < max(sc.min_valid_samples, 1):
+            return None
+
+        counts = Counter(labels)
+        majority_label, majority_count = counts.most_common(1)[0]
+        consistency = majority_count / len(labels)
+
+        entropy = normalized_entropy(labels, _CLASSES)
+        disagreement = disagreement_ratio(labels)
+        # No rationale texts for semantic clustering in NLI mode
+        semantic_entropy = 0.0
+
+        ew = max(sc.uncertainty_entropy_weight, 0.0)
+        dw = max(sc.uncertainty_disagreement_weight, 0.0)
+        denom = max(ew + dw, 1e-8)
+
+        uncertainty = (ew * entropy + dw * disagreement) / denom
         uncertainty = min(max(uncertainty, 0.0), 1.0)
         stability = 1.0 - uncertainty
 

@@ -95,10 +95,7 @@ class EvidenceRetriever:
         if os.environ.get("VERIFACT_DISABLE_BM25", "0") == "1":
             logger.info("BM25 disabled via VERIFACT_DISABLE_BM25")
             return
-        # BM25 on 300K+ docs is too slow for interactive — skip unless corpus is small
-        if len(self.metadata) > 50_000:
-            logger.info(f"BM25 skipped: corpus too large ({len(self.metadata):,}) for interactive speed. Use FAISS-only.")
-            return
+        # BM25 is always enabled — hybrid retrieval improves recall at all corpus sizes
         try:
             from rank_bm25 import BM25Okapi
 

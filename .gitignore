@@ -61,3 +61,4 @@ web/out/
 # Cloudflare
 *.key
 *.pem
+.claude/settings.json
