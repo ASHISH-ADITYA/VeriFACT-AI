@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from config import Config
     from core.evidence_retriever import Evidence
     from core.llm_client import LLMClient
+    from core.verdict_engine import VerdictEngine
 
 _CLASSES = ["supported", "contradicted", "uncertain"]
 
@@ -42,9 +43,15 @@ Use 'uncertain' if evidence is weak, missing, or mixed."""
 class SelfCheckScorer:
     """Estimate claim-level consistency uncertainty using repeated judgments."""
 
-    def __init__(self, llm: LLMClient | None, config: Config) -> None:
+    def __init__(
+        self,
+        llm: LLMClient | None,
+        config: Config,
+        verdict_engine: VerdictEngine | None = None,
+    ) -> None:
         self.llm = llm
         self.config = config
+        self._verdict_engine = verdict_engine
 
     def score_claim(self, claim_text: str, evidence: list[Evidence]) -> dict | None:
         """Return self-check metrics, or None when unavailable.
@@ -121,12 +128,12 @@ class SelfCheckScorer:
 
         This gives uncertainty estimation WITHOUT needing an LLM.
         """
-        from core.verdict_engine import VerdictEngine
-
         sc = self.config.selfcheck
 
-        # Lazily initialise a shared VerdictEngine (heavy model load)
-        if not hasattr(self, "_verdict_engine"):
+        # Use injected VerdictEngine, or lazily initialise one as fallback
+        if self._verdict_engine is None:
+            from core.verdict_engine import VerdictEngine
+
             self._verdict_engine = VerdictEngine(self.config)
 
         nli_results = self._verdict_engine._batch_nli(claim_text, evidence)

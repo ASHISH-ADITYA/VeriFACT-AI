@@ -140,10 +140,127 @@ class EvidenceRetriever:
 
     @timed
     def batch_retrieve(self, claims: list[str], top_k: int | None = None) -> list[list[Evidence]]:
-        """Batch hybrid retrieval: dense + BM25 + rerank per claim."""
-        if self.index is None:
+        """True batch hybrid retrieval: dense + BM25 + RRF + batch rerank."""
+        if self.index is None or not claims:
             return [[] for _ in claims]
-        return [self.retrieve(claim, top_k) for claim in claims]
+
+        k = top_k or self.config.retrieval.top_k
+        fetch_k = max(k * 3, 10)
+        n = len(claims)
+
+        # ── Step 1: Batch dense retrieval (encode + FAISS search all at once) ──
+        embeddings = self.encoder.encode(
+            claims,
+            normalize_embeddings=self.config.embedding.normalize,
+            batch_size=len(claims),
+            show_progress_bar=False,
+        )
+        query_batch = np.array(embeddings, dtype=np.float32)
+
+        if self._use_numpy_search and self._embedding_matrix is not None:
+            scores_batch, indices_batch = self._numpy_search(query_batch, fetch_k)
+        else:
+            with self._faiss_lock:
+                scores_batch, indices_batch = self.index.search(query_batch, fetch_k)
+
+        dense_per_claim = [
+            self._build_evidence(scores_batch[i], indices_batch[i])
+            for i in range(n)
+        ]
+
+        # ── Step 2: BM25 sparse retrieval (per-claim, BM25 doesn't batch) ──
+        bm25_per_claim: list[list[Evidence]] = []
+        for claim in claims:
+            bm25_per_claim.append(
+                self._bm25_fetch(claim, fetch_k) if self._bm25 else []
+            )
+
+        # ── Step 3: Reciprocal Rank Fusion per claim ──
+        candidates_per_claim: list[list[Evidence]] = []
+        for i in range(n):
+            dense_results = dense_per_claim[i]
+            bm25_results = bm25_per_claim[i]
+
+            if not bm25_results:
+                candidates_per_claim.append(dense_results)
+                continue
+
+            rrf_k = 60
+            scored: dict[int, float] = {}
+            evidence_map: dict[int, Evidence] = {}
+
+            for rank, ev in enumerate(dense_results):
+                scored[ev.chunk_id] = scored.get(ev.chunk_id, 0) + 1.0 / (rrf_k + rank + 1)
+                evidence_map[ev.chunk_id] = ev
+
+            for rank, ev in enumerate(bm25_results):
+                scored[ev.chunk_id] = scored.get(ev.chunk_id, 0) + 1.0 / (rrf_k + rank + 1)
+                if ev.chunk_id not in evidence_map:
+                    evidence_map[ev.chunk_id] = ev
+
+            sorted_ids = sorted(scored, key=lambda cid: scored[cid], reverse=True)
+            candidates_per_claim.append(
+                [evidence_map[cid] for cid in sorted_ids[:fetch_k]]
+            )
+
+        # ── Step 4: Batch rerank across ALL claims in one predict() call ──
+        if self._reranker is None:
+            return [cands[:k] for cands in candidates_per_claim]
+
+        # Build a single flat list of (query, passage) pairs with a mapping back
+        all_pairs: list[tuple[str, str]] = []
+        pair_map: list[tuple[int, int]] = []  # (claim_idx, candidate_idx)
+        needs_rerank: list[bool] = []
+
+        for i in range(n):
+            cands = candidates_per_claim[i]
+            if len(cands) <= k:
+                needs_rerank.append(False)
+            else:
+                needs_rerank.append(True)
+                for j, ev in enumerate(cands):
+                    all_pairs.append((claims[i], ev.text))
+                    pair_map.append((i, j))
+
+        if not all_pairs:
+            return [cands[:k] for cands in candidates_per_claim]
+
+        try:
+            rerank_scores = self._reranker.predict(all_pairs, show_progress_bar=False)
+        except Exception as exc:
+            logger.warning(f"Batch reranking failed ({exc}) — returning un-reranked results")
+            return [cands[:k] for cands in candidates_per_claim]
+
+        # Distribute scores back per claim
+        score_lookup: dict[tuple[int, int], float] = {}
+        for idx, (ci, cj) in enumerate(pair_map):
+            score_lookup[(ci, cj)] = float(rerank_scores[idx])
+
+        results: list[list[Evidence]] = []
+        for i in range(n):
+            cands = candidates_per_claim[i]
+            if not needs_rerank[i]:
+                results.append(cands[:k])
+                continue
+
+            scored_cands = [
+                (ev, score_lookup[(i, j)]) for j, ev in enumerate(cands)
+            ]
+            scored_cands.sort(key=lambda x: x[1], reverse=True)
+            reranked = [
+                Evidence(
+                    text=ev.text,
+                    source=ev.source,
+                    title=ev.title,
+                    url=ev.url,
+                    similarity=float(1 / (1 + np.exp(-score))),
+                    chunk_id=ev.chunk_id,
+                )
+                for ev, score in scored_cands[:k]
+            ]
+            results.append(reranked)
+
+        return results
 
     # ------------------------------------------------------------------
     # Hybrid fetch: dense FAISS + sparse BM25 with reciprocal rank fusion

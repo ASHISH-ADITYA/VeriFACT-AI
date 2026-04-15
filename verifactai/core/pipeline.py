@@ -61,7 +61,7 @@ class VeriFactPipeline:
         self.decomposer = ClaimDecomposer(self.llm)
         self.retriever = EvidenceRetriever(self.config)
         self.verdict_engine = VerdictEngine(self.config)
-        self.selfcheck = SelfCheckScorer(self.llm, self.config)
+        self.selfcheck = SelfCheckScorer(self.llm, self.config, verdict_engine=self.verdict_engine)
         self.annotator = AnnotatedOutputGenerator(
             llm=self.llm,
             reflexion_enabled=self.config.reflexion.enabled,
@@ -97,9 +97,10 @@ class VeriFactPipeline:
             claim.evidence = evidence
         logger.info("Stage 2 complete: evidence retrieved")
 
-        # Stage 3 — NLI Verdict + Confidence
-        for claim in claims:
-            verdict = self.verdict_engine.judge(claim, claim.evidence)
+        # Stage 3 — NLI Verdict + Confidence (batched across all claims)
+        claims_with_evidence = [(claim, claim.evidence) for claim in claims]
+        verdicts = self.verdict_engine.batch_judge(claims_with_evidence)
+        for claim, verdict in zip(claims, verdicts, strict=False):
             claim.verdict = verdict.label
             claim.confidence = verdict.confidence
             claim.uncertainty = verdict.uncertainty
@@ -197,10 +198,11 @@ class VeriFactPipeline:
             claim.evidence = evidence
         logger.info("Stage 2 complete: evidence retrieved")
 
-        # Stage 3 — NLI Verdict + Confidence
+        # Stage 3 — NLI Verdict + Confidence (batched across all claims)
         yield {"event": "status", "data": {"stage": "judging", "message": "Assigning verdicts..."}}
-        for claim in claims:
-            verdict = self.verdict_engine.judge(claim, claim.evidence)
+        claims_with_evidence = [(claim, claim.evidence) for claim in claims]
+        verdicts = self.verdict_engine.batch_judge(claims_with_evidence)
+        for claim, verdict in zip(claims, verdicts, strict=False):
             claim.verdict = verdict.label
             claim.confidence = verdict.confidence
             claim.uncertainty = verdict.uncertainty

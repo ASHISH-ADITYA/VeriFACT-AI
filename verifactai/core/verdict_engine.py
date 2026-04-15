@@ -130,104 +130,8 @@ class VerdictEngine:
         # Step 1 — run NLI for each (evidence, claim) pair
         nli_results = self._batch_nli(claim.text, evidence_list)
 
-        # Step 1b — contradiction-aware evidence mining
-        # Track best support AND best contradiction evidence separately.
-        # This ensures we never discard strong contradiction signal just
-        # because support evidence has higher similarity.
-        best_contra_nli = max(nli_results, key=lambda r: r.contradiction)
-
-        # If best contradiction evidence is strong (>0.50) AND its similarity
-        # is reasonable (>0.30), this is a real contradiction signal — not noise.
-        has_real_contradiction_evidence = (
-            best_contra_nli.contradiction > 0.50 and best_contra_nli.evidence.similarity > 0.30
-        )
-
-        # Step 2 — aggregate with specificity gate
-        #
-        # Key insight: NLI models often give high entailment for
-        # "topically similar" passages that don't actually verify
-        # the specific claim.  We require BOTH high NLI entailment
-        # AND high retrieval similarity for a SUPPORTED verdict.
-        #
-        max_con = max(r.contradiction for r in nli_results)
-        best_contra = max(nli_results, key=lambda r: r.contradiction)
-
-        # For entailment, require specificity: entailment * similarity
-        # This penalises high-NLI + low-similarity (topical but not specific)
-        similarity_gate = 0.45  # tuned: P25 of correct-claim similarity is 0.53
-
-        specific_support_scores = []
-        for r in nli_results:
-            sim = r.evidence.similarity
-            if sim >= similarity_gate and r.entailment > 0.5:
-                specific_support_scores.append(r.entailment * sim)
-            else:
-                specific_support_scores.append(0.0)
-
-        max_specific_ent = max(specific_support_scores) if specific_support_scores else 0.0
-        max_raw_ent = max(r.entailment for r in nli_results)
-
-        best_support_idx = (
-            max(range(len(specific_support_scores)), key=lambda i: specific_support_scores[i])
-            if specific_support_scores
-            else 0
-        )
-        best_support = nli_results[best_support_idx]
-
-        # Step 3 — verdict label (tightened + soft contradiction path)
-        nc = self.config.nli
-
-        # CONTRADICTED if:
-        #   Hard path: NLI contradiction > threshold AND > raw entailment
-        #   Soft path: moderate contradiction (>0.50) AND > specificity-gated entailment
-        #   The soft path catches cases with small corpus / indirect evidence
-        is_contradicted = (max_con > nc.contradiction_threshold and max_con > max_raw_ent) or (
-            max_con > 0.50 and max_con > max_specific_ent
-        )
-
-        if is_contradicted:
-            label = "CONTRADICTED"
-            best_ev = best_contra.evidence
-        elif max_specific_ent > nc.entailment_threshold:
-            # Only SUPPORTED if evidence is both relevant AND entailing
-            label = "SUPPORTED"
-            best_ev = best_support.evidence
-        elif has_real_contradiction_evidence:
-            # Step 3b — contradiction-aware fallback
-            # Don't default to UNVERIFIABLE if we have real contradiction evidence.
-            # This catches cases where support evidence is weak but contradiction
-            # evidence exists — the claim is more likely wrong than unknown.
-            label = "CONTRADICTED"
-            best_ev = best_contra_nli.evidence
-        else:
-            label = "UNVERIFIABLE"
-            best_ev = best_support.evidence
-
-        # Step 4 — uncertainty signal (semantic-entropy proxy + disagreement)
-        uncertainty = self._uncertainty_score(nli_results)
-        stability = round(1.0 - uncertainty, 4)
-
-        # Step 5 — calibrated confidence (uses specificity-gated entailment)
-        confidence = self._bayesian_confidence(
-            nli_results, evidence_list, max_specific_ent, max_con, uncertainty
-        )
-
-        return Verdict(
-            label=label,
-            confidence=confidence,
-            uncertainty=uncertainty,
-            stability=stability,
-            best_evidence=best_ev,
-            nli_scores={
-                "entailment": round(max_specific_ent, 4),
-                "raw_entailment": round(max_raw_ent, 4),
-                "neutral": round(max(0, 1 - max_raw_ent - max_con), 4),
-                "contradiction": round(max_con, 4),
-                "uncertainty": uncertainty,
-                "stability": stability,
-            },
-            all_nli=nli_results,
-        )
+        # Steps 2–5 — apply verdict logic (shared with batch_judge)
+        return self._apply_verdict_logic(claim, evidence_list, nli_results)
 
     def _uncertainty_score(self, nli_results: list[NLIResult]) -> float:
         """
@@ -262,6 +166,201 @@ class VerdictEngine:
             + cw.uncertainty_disagreement_weight * disagreement
         )
         return round(min(max(uncertainty, 0.0), 1.0), 4)
+
+    # ------------------------------------------------------------------
+    # Cross-claim batch judging
+    # ------------------------------------------------------------------
+    def batch_judge(
+        self, claims_with_evidence: list[tuple[Claim, list[Evidence]]]
+    ) -> list[Verdict]:
+        """Produce verdicts for multiple claims in one batched NLI forward pass.
+
+        Instead of calling judge() per claim (one forward pass each), this
+        collects ALL (premise, hypothesis) pairs across all claims, runs a
+        single tokenize + forward pass, then splits results back per-claim
+        and applies the same verdict logic.
+        """
+        from core.fact_rules import check_rules
+
+        # Pre-check: separate rule-overridden and no-evidence claims
+        verdicts: list[Verdict | None] = [None] * len(claims_with_evidence)
+        nli_work: list[tuple[int, Claim, list[Evidence]]] = []  # (original_idx, claim, evidence)
+
+        for idx, (claim, evidence_list) in enumerate(claims_with_evidence):
+            rule_violation = check_rules(claim.text)
+            if rule_violation is not None:
+                logger.info(
+                    f"Rule override [{rule_violation.rule_name}]: {claim.text[:60]} → CONTRADICTED"
+                )
+                rule_evidence = Evidence(
+                    text=rule_violation.correct_fact,
+                    source="factual_rule",
+                    title=f"Rule: {rule_violation.rule_name}",
+                    url="",
+                    similarity=1.0,
+                    chunk_id=-1,
+                )
+                verdicts[idx] = Verdict(
+                    label="CONTRADICTED",
+                    confidence=0.95,
+                    uncertainty=0.05,
+                    stability=0.95,
+                    best_evidence=rule_evidence,
+                    nli_scores={
+                        "entailment": 0.0,
+                        "contradiction": 1.0,
+                        "neutral": 0.0,
+                        "rule_override": True,
+                        "rule_name": rule_violation.rule_name,
+                        "rule_reason": rule_violation.reason,
+                    },
+                    all_nli=[],
+                )
+            elif not evidence_list:
+                verdicts[idx] = Verdict(
+                    label="NO_EVIDENCE",
+                    confidence=0.0,
+                    uncertainty=1.0,
+                    stability=0.0,
+                    best_evidence=None,
+                    nli_scores={"entailment": 0.0, "neutral": 1.0, "contradiction": 0.0},
+                    all_nli=[],
+                )
+            else:
+                nli_work.append((idx, claim, evidence_list))
+
+        if not nli_work:
+            return [v for v in verdicts if v is not None]  # type: ignore[misc]
+
+        # Collect ALL (premise, hypothesis) pairs across all claims
+        all_premises: list[str] = []
+        all_hypotheses: list[str] = []
+        all_evidence_refs: list[Evidence] = []
+        # Track boundaries: (start_offset, count) for each work item
+        boundaries: list[tuple[int, int]] = []
+
+        for _idx, claim, evidence_list in nli_work:
+            start = len(all_premises)
+            for ev in evidence_list:
+                all_premises.append(ev.text)
+                all_hypotheses.append(claim.text)
+                all_evidence_refs.append(ev)
+            boundaries.append((start, len(evidence_list)))
+
+        # Single tokenize + forward pass
+        inputs = self.tokenizer(
+            all_premises,
+            all_hypotheses,
+            padding=True,
+            truncation=True,
+            max_length=self.config.nli.max_input_length,
+            return_tensors="pt",
+        ).to(self.device)
+
+        with torch.no_grad():
+            logits = self.model(**inputs).logits
+            all_probs = torch.softmax(logits, dim=-1).cpu().numpy()
+
+        # Split results back per-claim and apply verdict logic
+        for work_i, (orig_idx, claim, evidence_list) in enumerate(nli_work):
+            start, count = boundaries[work_i]
+            nli_results: list[NLIResult] = []
+            for j in range(count):
+                p = all_probs[start + j]
+                nli_results.append(
+                    NLIResult(
+                        evidence=all_evidence_refs[start + j],
+                        contradiction=float(p[0]),
+                        neutral=float(p[1]),
+                        entailment=float(p[2]),
+                    )
+                )
+            verdicts[orig_idx] = self._apply_verdict_logic(claim, evidence_list, nli_results)
+
+        return [v for v in verdicts if v is not None]  # type: ignore[misc]
+
+    def _apply_verdict_logic(
+        self, claim: Claim, evidence_list: list[Evidence], nli_results: list[NLIResult]
+    ) -> Verdict:
+        """Apply specificity gate, soft contradiction, and confidence logic to NLI results.
+
+        Extracted from judge() so both judge() and batch_judge() share the same logic.
+        """
+        # Contradiction-aware evidence mining
+        best_contra_nli = max(nli_results, key=lambda r: r.contradiction)
+        has_real_contradiction_evidence = (
+            best_contra_nli.contradiction > 0.50 and best_contra_nli.evidence.similarity > 0.30
+        )
+
+        # Aggregate with specificity gate
+        max_con = max(r.contradiction for r in nli_results)
+        best_contra = max(nli_results, key=lambda r: r.contradiction)
+
+        similarity_gate = 0.45
+
+        specific_support_scores = []
+        for r in nli_results:
+            sim = r.evidence.similarity
+            if sim >= similarity_gate and r.entailment > 0.5:
+                specific_support_scores.append(r.entailment * sim)
+            else:
+                specific_support_scores.append(0.0)
+
+        max_specific_ent = max(specific_support_scores) if specific_support_scores else 0.0
+        max_raw_ent = max(r.entailment for r in nli_results)
+
+        best_support_idx = (
+            max(range(len(specific_support_scores)), key=lambda i: specific_support_scores[i])
+            if specific_support_scores
+            else 0
+        )
+        best_support = nli_results[best_support_idx]
+
+        # Verdict label
+        nc = self.config.nli
+
+        is_contradicted = (max_con > nc.contradiction_threshold and max_con > max_raw_ent) or (
+            max_con > 0.50 and max_con > max_specific_ent
+        )
+
+        if is_contradicted:
+            label = "CONTRADICTED"
+            best_ev = best_contra.evidence
+        elif max_specific_ent > nc.entailment_threshold:
+            label = "SUPPORTED"
+            best_ev = best_support.evidence
+        elif has_real_contradiction_evidence:
+            label = "CONTRADICTED"
+            best_ev = best_contra_nli.evidence
+        else:
+            label = "UNVERIFIABLE"
+            best_ev = best_support.evidence
+
+        # Uncertainty
+        uncertainty = self._uncertainty_score(nli_results)
+        stability = round(1.0 - uncertainty, 4)
+
+        # Confidence
+        confidence = self._bayesian_confidence(
+            nli_results, evidence_list, max_specific_ent, max_con, uncertainty
+        )
+
+        return Verdict(
+            label=label,
+            confidence=confidence,
+            uncertainty=uncertainty,
+            stability=stability,
+            best_evidence=best_ev,
+            nli_scores={
+                "entailment": round(max_specific_ent, 4),
+                "raw_entailment": round(max_raw_ent, 4),
+                "neutral": round(max(0, 1 - max_raw_ent - max_con), 4),
+                "contradiction": round(max_con, 4),
+                "uncertainty": uncertainty,
+                "stability": stability,
+            },
+            all_nli=nli_results,
+        )
 
     # ------------------------------------------------------------------
     # NLI inference
