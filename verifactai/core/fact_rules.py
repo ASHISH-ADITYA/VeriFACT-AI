@@ -104,6 +104,20 @@ CAPITAL_COUNTRY: dict[str, str] = {
     "bern": "Switzerland",
 }
 
+# Cities mapped to their countries (superset of capitals for city-location checks)
+CITY_COUNTRY: dict[str, str] = {
+    **CAPITAL_COUNTRY,
+    "sydney": "Australia",
+    "mumbai": "India",
+    "shanghai": "China",
+    "rio de janeiro": "Brazil",
+    "new york": "United States",
+    "los angeles": "United States",
+    "chicago": "United States",
+    "toronto": "Canada",
+    "mexico city": "Mexico",
+}
+
 COUNTRY_CONTINENT: dict[str, str] = {
     "china": "Asia",
     "japan": "Asia",
@@ -174,6 +188,28 @@ PERSON_DATES: list[tuple[str, int, int, int, int, str]] = [
     ("charles darwin", 1809, 1809, 1882, 1882, "Charles Darwin lived 1809-1882"),
 ]
 
+# ── Science facts (commonly tested) ──────────────────────────────
+# (keyword_set, attribute, correct_value, tolerance_low, tolerance_high, unit)
+SCIENCE_FACTS: list[tuple[list[str], str, float, float, float, str]] = [
+    (["water", "boil"], "temperature", 100, 95, 105, "degrees celsius"),
+    (["speed of light"], "speed", 300000, 290000, 310000, "km/s"),
+    (["human", "bone"], "count", 206, 200, 210, "bones"),
+    (["earth", "moon"], "count", 1, 1, 1, "moon"),
+    (["oxygen", "atmosphere"], "percentage", 21, 18, 23, "percent"),
+]
+
+# Simple true/false science facts
+SCIENCE_TRUTHS: dict[str, bool] = {
+    "earth revolves around the sun": True,
+    "sun revolves around the earth": False,
+    "earth orbits the sun": True,
+    "sun orbits the earth": False,
+    "gold is a gas": False,
+    "gold is a solid": True,
+    "sound travels faster than light": False,
+    "light travels faster than sound": True,
+}
+
 # ── Famous person facts ──────────────────────────────────────────
 
 PERSON_KNOWN_FOR: dict[str, list[str]] = {
@@ -240,6 +276,29 @@ def check_rules(claim_text: str) -> RuleViolation | None:
                         correct_fact=f"{capital.title()} is the capital of {correct_country}.",
                     )
 
+    # ── Rule 2b: City in wrong country/continent ──────────────
+    for city, correct_country in CITY_COUNTRY.items():
+        if city in lower:
+            # Check if claim places city in wrong country
+            for country in COUNTRY_CONTINENT:
+                if country in lower and country != correct_country.lower():
+                    return RuleViolation(
+                        rule_name="city_country",
+                        claim=claim_text,
+                        reason=f"{city.title()} is in {correct_country}, not {country.title()}.",
+                        correct_fact=f"{city.title()} is located in {correct_country}.",
+                    )
+            # Check if claim places city on wrong continent
+            correct_continent = COUNTRY_CONTINENT.get(correct_country.lower(), "")
+            for continent in CONTINENTS:
+                if continent in lower and continent not in correct_continent.lower():
+                    return RuleViolation(
+                        rule_name="city_continent",
+                        claim=claim_text,
+                        reason=f"{city.title()} is in {correct_country} ({correct_continent}), not {continent.title()}.",
+                        correct_fact=f"{city.title()} is in {correct_country}, {correct_continent}.",
+                    )
+
     # ── Rule 3: Country on wrong continent ────────────────────
     for country, correct_continent in COUNTRY_CONTINENT.items():
         if country in lower:
@@ -289,18 +348,27 @@ def check_rules(claim_text: str) -> RuleViolation | None:
                         )
 
     # ── Rule 5: Historical event with wrong date ─────────────
-    years_in_claim = [int(y) for y in re.findall(r"\b(\d{4})\b", lower)]
+    # Match "1920", "1700s", "1850s" etc.
+    years_in_claim = [int(y) for y in re.findall(r"\b(\d{4})s?\b", lower)]
     if years_in_claim:
-        for event_kw, min_year, max_year, correct_desc in HISTORICAL_EVENTS:
+        # Sort by keyword length descending to match "world war ii" before "world war i"
+        matched_event = None
+        for event_kw, min_year, max_year, correct_desc in sorted(
+            HISTORICAL_EVENTS, key=lambda e: len(e[0]), reverse=True
+        ):
             if event_kw in lower:
-                for year in years_in_claim:
-                    if year < min_year - 10 or year > max_year + 10:
-                        return RuleViolation(
-                            rule_name="event_date",
-                            claim=claim_text,
-                            reason=f"The year {year} is incompatible with {event_kw}. {correct_desc}.",
-                            correct_fact=correct_desc,
-                        )
+                matched_event = (event_kw, min_year, max_year, correct_desc)
+                break  # Use most specific (longest) match only
+        if matched_event:
+            event_kw, min_year, max_year, correct_desc = matched_event
+            for year in years_in_claim:
+                if year < min_year - 10 or year > max_year + 10:
+                    return RuleViolation(
+                        rule_name="event_date",
+                        claim=claim_text,
+                        reason=f"The year {year} is incompatible with {event_kw}. {correct_desc}.",
+                        correct_fact=correct_desc,
+                    )
 
         # ── Rule 6: Person born/active in impossible era ─────
         for person_kw, b_min, b_max, d_min, d_max, desc in PERSON_DATES:
@@ -343,5 +411,38 @@ def check_rules(claim_text: str) -> RuleViolation | None:
                             reason=f"{person_kw.title()} lived {b_min}-{d_max}, not the {century_str}.",
                             correct_fact=desc,
                         )
+
+    # ── Rule 8: Science fact with wrong number ─────────────────
+    word_numbers = {
+        "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4,
+        "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
+        "ten": 10, "eleven": 11, "twelve": 12, "twenty": 20,
+        "thirty": 30, "fifty": 50, "hundred": 100, "thousand": 1000,
+    }
+    numbers_in_claim = [float(n) for n in re.findall(r"(\d+(?:\.\d+)?)", lower)]
+    for word, val in word_numbers.items():
+        if f" {word} " in f" {lower} ":
+            numbers_in_claim.append(float(val))
+    if numbers_in_claim:
+        for keywords, attr, correct_val, tol_lo, tol_hi, unit in SCIENCE_FACTS:
+            if all(kw in lower for kw in keywords):
+                for num in numbers_in_claim:
+                    if num < tol_lo or num > tol_hi:
+                        return RuleViolation(
+                            rule_name="science_number",
+                            claim=claim_text,
+                            reason=f"The correct {attr} is ~{correct_val} {unit}, not {num}.",
+                            correct_fact=f"The correct value is approximately {correct_val} {unit}.",
+                        )
+
+    # ── Rule 9: Simple science true/false ────────────────────
+    for statement, is_true in SCIENCE_TRUTHS.items():
+        if statement in lower and not is_true:
+            return RuleViolation(
+                rule_name="science_fact",
+                claim=claim_text,
+                reason=f'The statement "{statement}" is factually false.',
+                correct_fact=f'"{statement}" is a common misconception.',
+            )
 
     return None

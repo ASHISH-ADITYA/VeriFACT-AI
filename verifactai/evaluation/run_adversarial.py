@@ -49,7 +49,20 @@ def main() -> None:
         t0 = time.perf_counter()
         try:
             r = pipeline.verify_text(claim_text)
-            actual = r.claims[0].verdict if r.claims else "NO_EVIDENCE"
+            if not r.claims:
+                actual = "NO_EVIDENCE"
+            else:
+                # Check ALL sub-claims, not just claims[0].
+                # If ANY sub-claim is CONTRADICTED, the input is CONTRADICTED.
+                # This handles LLM decomposer splitting "X is in Y" into
+                # ["X exists" (SUPPORTED), "X is in Y" (CONTRADICTED)].
+                verdicts = [c.verdict for c in r.claims]
+                if "CONTRADICTED" in verdicts:
+                    actual = "CONTRADICTED"
+                elif "SUPPORTED" in verdicts:
+                    actual = "SUPPORTED"
+                else:
+                    actual = verdicts[0]
         except Exception as e:
             actual = "ERROR"
             print(f"  ERROR on claim {i}: {e}")
