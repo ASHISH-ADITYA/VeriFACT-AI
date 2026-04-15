@@ -1,10 +1,10 @@
 """
 Unified LLM client with ordered fallback chain.
 
-Query mode (strict=False):  Ollama → Anthropic → OpenAI → returns None
+Query mode (strict=False):  Primary → Groq → Anthropic → OpenAI → returns None
 Eval mode  (strict=True):   Primary provider only; raises on failure.
 
-Supports: Ollama (free local), Anthropic Claude, OpenAI GPT.
+Supports: Ollama (free local), Groq (free cloud), Anthropic Claude, OpenAI GPT.
 """
 
 from __future__ import annotations
@@ -44,6 +44,8 @@ class LLMClient:
         self._try_init(self._primary_provider)
 
         # Prepare optional fallbacks (only if keys are configured)
+        if self.config.groq_api_key and "groq" not in self._clients:
+            self._try_init("groq")
         if self.config.anthropic_api_key and "anthropic" not in self._clients:
             self._try_init("anthropic")
         if self.config.openai_api_key and "openai" not in self._clients:
@@ -61,6 +63,12 @@ class LLMClient:
                 logger.info(
                     f"Ollama configured (model={self.config.model}, url={self.config.ollama_base_url})"
                 )
+            elif provider == "groq":
+                self._clients["groq"] = {
+                    "base_url": "https://api.groq.com/openai/v1",
+                    "api_key": self.config.groq_api_key,
+                }
+                logger.info("Groq configured (model=llama-3.1-8b-instant)")
             elif provider == "anthropic":
                 import anthropic
 
@@ -138,7 +146,7 @@ class LLMClient:
     ) -> str | None:
         # Build ordered fallback chain: primary first, then others
         chain = [self._primary_provider]
-        for p in ["ollama", "anthropic", "openai"]:
+        for p in ["ollama", "groq", "anthropic", "openai"]:
             if p != self._primary_provider and p in self._clients:
                 chain.append(p)
 
@@ -177,6 +185,7 @@ class LLMClient:
     # Fallback model names when primary model is Ollama-specific.
     # Only used when fallback chain reaches a paid provider.
     _FALLBACK_MODELS = {
+        "groq": "llama-3.1-8b-instant",
         "anthropic": "claude-sonnet-4-20250514",
         "openai": "gpt-4o-mini",
     }
@@ -190,6 +199,8 @@ class LLMClient:
         model = self.config.model
         if provider == "ollama":
             return model
+        if provider == "groq":
+            return "llama-3.1-8b-instant"
         # Ollama model names contain ':' — not valid for cloud providers
         if ":" in model or model.startswith("llama") or model.startswith("qwen"):
             fallback = self._FALLBACK_MODELS.get(provider, model)
@@ -205,6 +216,14 @@ class LLMClient:
             if provider == "ollama":
                 return self._call_ollama(
                     user=user, system=system, temperature=temperature, max_tokens=max_tokens
+                )
+            elif provider == "groq":
+                return self._call_groq(
+                    model=model,
+                    user=user,
+                    system=system,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
                 )
             elif provider == "anthropic":
                 client = self._clients["anthropic"]
@@ -274,6 +293,46 @@ class LLMClient:
         content = parsed.get("message", {}).get("content", "")
         if not content:
             raise RuntimeError("Ollama returned an empty response")
+        return content
+
+    # ------------------------------------------------------------------
+    # Groq HTTP call (OpenAI-compatible, no SDK needed)
+    # ------------------------------------------------------------------
+    def _call_groq(
+        self, *, model: str, user: str, system: str, temperature: float, max_tokens: int
+    ) -> str:
+        cfg = self._clients["groq"]
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        req = urllib.request.Request(
+            f"{cfg['base_url']}/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {cfg['api_key']}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                body = resp.read().decode("utf-8")
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Groq API request failed: {exc}") from exc
+
+        parsed = json.loads(body)
+        choices = parsed.get("choices", [])
+        if not choices:
+            raise RuntimeError("Groq returned no choices")
+        content = choices[0].get("message", {}).get("content", "")
+        if not content:
+            raise RuntimeError("Groq returned an empty response")
         return content
 
     # ------------------------------------------------------------------

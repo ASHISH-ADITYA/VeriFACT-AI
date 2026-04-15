@@ -122,7 +122,7 @@ async function callAPI(text) {
   const store = await chrome.storage.local.get(["verifactApiUrl", "verifactEnabled", "verifactApiToken"]);
   if (store.verifactEnabled === false) return null;
 
-  const url = store.verifactApiUrl || "https://adiashish-verifact-ai.hf.space/analyze";
+  const url = store.verifactApiUrl || "https://adiashish-verifact-ai.hf.space/analyze/fast";
   const token = store.verifactApiToken || "";
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 90000);

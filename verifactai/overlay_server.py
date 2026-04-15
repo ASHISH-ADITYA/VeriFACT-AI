@@ -508,9 +508,46 @@ class OverlayHandler(BaseHTTPRequestHandler):
         except Exception as exc:
             self._json_response(500, {"error": str(exc)})
 
+    def _handle_analyze_fast(self) -> None:
+        """POST /analyze/fast -- lightweight fast-path for extension monitoring.
+
+        Runs ONLY: spaCy decomposition + rule check + FAISS retrieval (no
+        BM25/reranker) + batch NLI verdict (no selfcheck/corrections).
+        Target: <5s for 3 claims on HF free CPU.
+        """
+        if not self._validate_request():
+            return
+
+        payload = self._read_json_body()
+        if payload is None:
+            return
+
+        text = (payload.get("text") or "").strip()
+        if not text:
+            self._json_response(400, {"error": "text is required"})
+            return
+
+        max_text = 50_000
+        if len(text) > max_text:
+            self._json_response(400, {"error": f"Text too long (max {max_text} chars)"})
+            return
+
+        top_claims = min(int(payload.get("top_claims", 6)), 20)
+
+        try:
+            pipeline = get_pipeline()
+            result = pipeline.verify_text_fast(text)
+            self._json_response(200, result_payload(result, top_claims=top_claims))
+        except Exception as exc:
+            self._json_response(500, {"error": str(exc)})
+
     def do_POST(self) -> None:  # noqa: N802
         if self.path == "/analyze/stream":
             self._handle_analyze_stream()
+            return
+
+        if self.path == "/analyze/fast":
+            self._handle_analyze_fast()
             return
 
         if self.path == "/optimize":

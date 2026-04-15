@@ -339,6 +339,103 @@ class VeriFactPipeline:
 
     # ------------------------------------------------------------------
     @timed
+    def verify_text_fast(self, text: str) -> VerificationResult:
+        """Lightweight fast-path for the browser extension.
+
+        Runs ONLY: spaCy decomposition + rule check + FAISS retrieval
+        (no BM25, no reranker) + batch NLI verdict (no selfcheck).
+        Skips: corrections, reflexion, constitutional, HTML generation.
+
+        Target: <5s for 3 claims on HF free CPU.
+        """
+        cache_key = f"ultrafast:{md5_hash(text)}"
+        if cache_key in self._cache:
+            logger.info("Cache hit — returning cached fast result")
+            return self._cache[cache_key]
+
+        start = time.perf_counter()
+
+        # Stage 1 — Claim Decomposition (spaCy fallback, fast)
+        claims = self.decomposer.decompose(text)
+        logger.info(f"[fast] Stage 1: {len(claims)} claims extracted")
+
+        # Stage 2a — Rule check (instant)
+        from core.evidence_retriever import Evidence
+        from core.fact_rules import check_rules
+
+        rule_resolved: set[Any] = set()
+        for claim in claims:
+            rule = check_rules(claim.text)
+            if rule:
+                claim.evidence = [Evidence(
+                    text=rule.correct_fact, source="factual_rule",
+                    title=f"Rule: {rule.rule_name}", url="", similarity=1.0, chunk_id=-1,
+                )]
+                claim.verdict = "CONTRADICTED"
+                claim.confidence = 0.95
+                claim.uncertainty = 0.05
+                claim.stability = 0.95
+                claim.best_evidence = claim.evidence[0]
+                claim.nli_scores = {
+                    "rule_override": True,
+                    "rule_name": rule.rule_name,
+                    "rule_reason": rule.reason,
+                }
+                claim.all_nli_results = []
+                rule_resolved.add(claim.id)
+
+        # Stage 2b — FAISS-only retrieval (no BM25, no reranker)
+        unresolved = [c for c in claims if c.id not in rule_resolved]
+        if unresolved:
+            unresolved_texts = [c.text for c in unresolved]
+            evidence_batches = self.retriever.fast_retrieve(unresolved_texts)
+            for claim, evidence in zip(unresolved, evidence_batches, strict=False):
+                claim.evidence = evidence
+        logger.info(
+            f"[fast] Stage 2: {len(rule_resolved)} ruled, {len(unresolved)} FAISS-only"
+        )
+
+        # Stage 3 — Batch NLI verdict (no selfcheck)
+        if unresolved:
+            claims_with_evidence = [(claim, claim.evidence) for claim in unresolved]
+            verdicts = self.verdict_engine.batch_judge(claims_with_evidence)
+        else:
+            verdicts = []
+        for claim, verdict in zip(unresolved, verdicts, strict=False):
+            claim.verdict = verdict.label
+            claim.confidence = verdict.confidence
+            claim.uncertainty = verdict.uncertainty
+            claim.stability = verdict.stability
+            claim.best_evidence = verdict.best_evidence
+            claim.nli_scores = verdict.nli_scores
+            claim.all_nli_results = verdict.all_nli
+        logger.info("[fast] Stage 3: verdicts assigned (no selfcheck)")
+
+        # Stage 4 — JSON report only (skip corrections, skip HTML)
+        report_json = self.annotator.generate_json(text, claims)
+
+        elapsed = time.perf_counter() - start
+
+        result = VerificationResult(
+            original_text=text,
+            llm_query=None,
+            claims=claims,
+            annotated_html="",  # skipped for speed
+            report_json=report_json,
+            factuality_score=report_json["factuality_score"],
+            total_claims=report_json["total_claims"],
+            supported=report_json["supported"],
+            contradicted=report_json["contradicted"],
+            unverifiable=report_json["unverifiable"],
+            no_evidence=report_json["no_evidence"],
+            processing_time=round(elapsed, 2),
+        )
+
+        self._cache[cache_key] = result
+        return result
+
+    # ------------------------------------------------------------------
+    @timed
     def verify_text(self, text: str, fast_mode: bool = False) -> VerificationResult:
         """Public verification API.
 

@@ -320,6 +320,42 @@ class EvidenceRetriever:
         return results
 
     # ------------------------------------------------------------------
+    # Fast retrieval: FAISS-only, no BM25 / reranker (for /analyze/fast)
+    # ------------------------------------------------------------------
+    def fast_retrieve(
+        self, claims: list[str], top_k: int | None = None
+    ) -> list[list[Evidence]]:
+        """Batch FAISS-only retrieval — no BM25, no reranker.
+
+        Designed for the extension fast-path where latency matters more
+        than marginal recall gains.  Returns top-k evidence per claim
+        (default: 3).
+        """
+        if self.index is None or not claims:
+            return [[] for _ in claims]
+
+        k = top_k or min(self.config.retrieval.top_k, 3)
+
+        embeddings = self.encoder.encode(
+            claims,
+            normalize_embeddings=self.config.embedding.normalize,
+            batch_size=len(claims),
+            show_progress_bar=False,
+        )
+        query_batch = np.array(embeddings, dtype=np.float32)
+
+        if self._use_numpy_search and self._embedding_matrix is not None:
+            scores_batch, indices_batch = self._numpy_search(query_batch, k)
+        else:
+            with self._faiss_lock:
+                scores_batch, indices_batch = self.index.search(query_batch, k)
+
+        return [
+            self._build_evidence(scores_batch[i], indices_batch[i])
+            for i in range(len(claims))
+        ]
+
+    # ------------------------------------------------------------------
     # Hybrid fetch: dense FAISS + sparse BM25 with reciprocal rank fusion
     # ------------------------------------------------------------------
     def _hybrid_fetch(self, query: str, fetch_k: int) -> list[Evidence]:

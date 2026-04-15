@@ -64,10 +64,17 @@ PROFILES: dict[Profile, PerformanceProfile] = {
 class LLMConfig(BaseModel):
     """LLM provider settings."""
 
-    provider: str = Field(default_factory=lambda: os.getenv("LLM_PROVIDER", "ollama"))
+    provider: str = Field(
+        default_factory=lambda: (
+            "groq"
+            if os.getenv("LLM_PROVIDER", "ollama") == "none" and os.getenv("GROQ_API_KEY", "")
+            else os.getenv("LLM_PROVIDER", "ollama")
+        )
+    )
     ollama_base_url: str = Field(
         default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     )
+    groq_api_key: str = Field(default_factory=lambda: os.getenv("GROQ_API_KEY", ""))
     anthropic_api_key: str = Field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
     openai_api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     model: str = Field(default_factory=lambda: os.getenv("LLM_MODEL", "qwen2.5:3b-instruct"))
