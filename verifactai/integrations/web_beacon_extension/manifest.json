@@ -11,7 +11,8 @@
     "https://chat.openai.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*",
-    "http://127.0.0.1:8765/*"
+    "http://127.0.0.1:8765/*",
+    "https://adiashish-verifact-ai.hf.space/*"
   ],
   "background": {
     "service_worker": "background.js"

@@ -7,7 +7,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   const token = existing.verifactApiToken || randomToken();
 
   chrome.storage.local.set({
-    verifactApiUrl: "http://127.0.0.1:8765/analyze",
+    verifactApiUrl: "https://adiashish-verifact-ai.hf.space/analyze",
     verifactEnabled: true,
     verifactApiToken: token
   });
