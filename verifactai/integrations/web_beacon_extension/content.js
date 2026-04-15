@@ -134,23 +134,31 @@ async function callAnalyzer(text) {
   const apiUrl = store.verifactApiUrl || "https://adiashish-verifact-ai.hf.space/analyze";
   const apiToken = store.verifactApiToken || "";
 
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(apiToken ? { "X-VeriFact-Token": apiToken } : {}),
-    },
-    body: JSON.stringify({
-      text,
-      source: PLATFORM,
-      mode: "fast",
-      include_claims: true,
-      top_claims: 6,
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
+  try {
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(apiToken ? { "X-VeriFact-Token": apiToken } : {}),
+      },
+      body: JSON.stringify({
+        text,
+        source: PLATFORM,
+        mode: "fast",
+        include_claims: true,
+        top_claims: 6,
+      }),
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ── Claim rendering ──────────────────────────────────
@@ -279,8 +287,9 @@ async function scan() {
     renderPanel(result);
     highlightClaims(latestTargetNode, result.flags || []);
   } catch (err) {
-    setBeacon("error", "Offline");
-    pulseTicker([{ category: "red_flag", message: "Backend unavailable." }]);
+    const isTimeout = err.name === "AbortError";
+    setBeacon("error", isTimeout ? "Timeout" : "Offline");
+    pulseTicker([{ category: "red_flag", message: isTimeout ? "Analysis timed out. Try a shorter response." : "Backend unavailable." }]);
   }
 }
 
