@@ -347,21 +347,23 @@
 /* ── Inline highlights (in chatbot text) ─────────────── */
 
 .verifact-hl-red {
-  background: rgba(239, 68, 68, 0.15);
-  border-bottom: 2px solid rgba(239, 68, 68, 0.7);
-  border-radius: 3px;
-  padding: 1px 3px;
+  background: rgba(239, 68, 68, 0.28);
+  border-radius: 4px;
+  padding: 2px 4px;
   cursor: help;
   transition: background 0.15s ease;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
-.verifact-hl-red:hover { background: rgba(239, 68, 68, 0.25); }
+.verifact-hl-red:hover { background: rgba(239, 68, 68, 0.45); }
 
 .verifact-hl-yellow {
-  background: rgba(245, 158, 11, 0.12);
-  border-bottom: 2px solid rgba(245, 158, 11, 0.6);
-  border-radius: 3px;
-  padding: 1px 3px;
+  background: rgba(245, 158, 11, 0.25);
+  border-radius: 4px;
+  padding: 2px 4px;
   cursor: help;
   transition: background 0.15s ease;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
-.verifact-hl-yellow:hover { background: rgba(245, 158, 11, 0.22); }
+.verifact-hl-yellow:hover { background: rgba(245, 158, 11, 0.4); }
