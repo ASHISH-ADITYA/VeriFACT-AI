@@ -34,7 +34,14 @@
       "run_at": "document_idle"
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["logo.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "action": {
-    "default_title": "VeriFact Beacon"
+    "default_title": "VeriFact Beacon",
+    "default_icon": "logo.png"
   }
 }

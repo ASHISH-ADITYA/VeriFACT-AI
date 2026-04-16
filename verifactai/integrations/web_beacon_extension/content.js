@@ -51,10 +51,12 @@ function extractFactualText(text) {
 
 // ── Beacon ───────────────────────────────────────────
 
+const LOGO_URL = chrome.runtime.getURL("logo.png");
+
 const beacon = document.createElement("button");
 beacon.className = "verifact-beacon idle";
 beacon.title = "VeriFACT AI — Drag to move, click for dashboard";
-beacon.innerHTML = '<span class="verifact-beacon-label">VF</span><span class="verifact-beacon-status">Ready</span>';
+beacon.innerHTML = `<img src="${LOGO_URL}" class="verifact-beacon-logo" alt="VF" /><span class="verifact-beacon-status">Ready</span>`;
 document.body.appendChild(beacon);
 
 function setBeacon(state, statusText) {
@@ -358,7 +360,7 @@ function renderDashboard() {
   panelEl.innerHTML = `<div class="vf-dash-inner">
     <button class="vf-close" title="Close">&times;</button>
     <div class="vf-dash-header">
-      <a href="https://web-five-mocha-51.vercel.app" target="_blank" rel="noreferrer" class="vf-logo" title="Open VeriFACT Dashboard">VF</a>
+      <a href="https://web-five-mocha-51.vercel.app" target="_blank" rel="noreferrer" class="vf-logo" title="Open VeriFACT Dashboard"><img src="${LOGO_URL}" class="vf-logo-img" alt="VF" /></a>
       <div class="vf-title">VeriFACT AI</div>
       <div class="vf-subtitle">${PLATFORM.charAt(0).toUpperCase() + PLATFORM.slice(1)} &middot; ${msgs} messages scanned</div>
     </div>
