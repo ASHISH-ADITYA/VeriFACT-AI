@@ -22,8 +22,9 @@
 % ── Packages ──────────────────────────────────────────
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage{lmodern}
+\usepackage{mathptmx}  % Times New Roman-style formal font
 \usepackage[margin=2.5cm]{geometry}
+\usepackage{ragged2e}  % For justified text
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{tabularx}
@@ -104,6 +105,28 @@
     urlcolor=blue!60!black,
 }
 
+% ── Justified text globally ───────────────────────────
+\justifying
+
+% ── Figure borders ────────────────────────────────────
+% All figures get a thin border
+\usepackage[export]{adjustbox}
+\let\oldincludegraphics\includegraphics
+\renewcommand{\includegraphics}[2][]{%
+  \oldincludegraphics[#1,frame]{#2}%
+}
+
+% ── Enhanced table row spacing ────────────────────────
+\renewcommand{\arraystretch}{1.3}
+
+% ── Caption formatting ────────────────────────────────
+\captionsetup{
+  font={small},
+  labelfont={bf},
+  format=hang,
+  margin=1cm,
+}
+
 % ── Custom Commands ───────────────────────────────────
 \newcommand{\verifact}{\textsc{VeriFACT~AI}}
 \newcommand{\deberta}{DeBERTa-v3}
@@ -153,23 +176,17 @@
 % ── Certificate of Examination ────────────────────────
 \newpage
 \thispagestyle{empty}
-\thispagestyle{empty}
 
 \begin{center}
     {\Large\textbf{Certificate}}\\[1.5cm]
 
-   \includegraphics[width=0.5\linewidth]{Central_University_of_Jharkhand_logo.png}
-    \label{fig:placeholder}
-\begin{figure}
-    \centering
-    
-\end{figure}
+   \includegraphics[width=0.4\linewidth]{Central_University_of_Jharkhand_logo.png}
 \end{center}
 
 \noindent
 \textbf{Name:} Aditya Ashish\\
 \textbf{Registration Number:} 22190503004\\
-\textbf{Title of the Project:} MRI Brain Tumor Detection System Using VGG16\\[0.8cm]
+\textbf{Title of the Project:} VeriFACT AI: Real-Time LLM Hallucination Detection Using Retrieval-Augmented Verification\\[0.8cm]
 
 \noindent
 This is to certify that the project report entitled 
@@ -606,21 +623,21 @@ Table~\ref{tab:modules} summarizes all 13 core Python modules.
 \toprule
 \textbf{Module} & \textbf{LoC} & \textbf{Responsibility} \\
 \midrule
-\texttt{evidence\_retriever.py} & 650 & FAISS + BM25 + RRF + reranker + Wikipedia API \\
-\texttt{overlay\_server.py} & 620 & HTTP API, CORS, auth, rate limiting, SSE \\
-\texttt{prompt\_optimizer.py} & 550 & Prompt quality scoring + template rewriting \\
-\texttt{verdict\_engine.py} & 500 & DeBERTa NLI, batch judging, fabrication detection \\
-\texttt{fact\_rules.py} & 450 & 205 hardcoded rules, 9 categories \\
-\texttt{claim\_decomposer.py} & 335 & LLM + spaCy claim extraction \\
-\texttt{llm\_client.py} & 320 & Multi-provider LLM fallback chain \\
-\texttt{pipeline.py} & 320 & Main orchestrator, caching, streaming \\
-\texttt{annotator.py} & 310 & HTML/JSON output, corrections, Reflexion \\
-\texttt{config.py} & 230 & Pydantic-based centralized configuration \\
-\texttt{selfcheck.py} & 210 & Self-consistency scoring, NLI fallback \\
-\texttt{semantic\_entropy.py} & 115 & Entropy, disagreement, Jaccard clustering \\
-\texttt{hallucination\_discrim.py} & 80 & TF-IDF + LogReg binary classifier \\
+\texttt{evidence\_retriever.py} & 872 & FAISS + BM25 + RRF + reranker + Wikipedia API + entity verification \\
+\texttt{prompt\_optimizer.py} & 664 & Prompt quality scoring + template rewriting \\
+\texttt{overlay\_server.py} & 653 & HTTP API, CORS, auth, rate limiting, SSE streaming \\
+\texttt{verdict\_engine.py} & 586 & DeBERTa NLI, batch judging, fabrication detection, LLM-as-judge \\
+\texttt{pipeline.py} & 473 & Main orchestrator, caching, fast/full/streaming paths \\
+\texttt{fact\_rules.py} & 464 & 205 hardcoded rules, 9 categories \\
+\texttt{llm\_client.py} & 343 & Multi-provider LLM fallback (Groq/Ollama/Anthropic/OpenAI) \\
+\texttt{claim\_decomposer.py} & 335 & LLM + spaCy claim extraction, fact-density ranking \\
+\texttt{annotator.py} & 307 & HTML/JSON output, corrections, Reflexion, Constitutional \\
+\texttt{config.py} & 236 & Pydantic-based centralized configuration \\
+\texttt{selfcheck.py} & 212 & Self-consistency scoring, NLI fallback \\
+\texttt{semantic\_entropy.py} & 112 & Entropy, disagreement, Jaccard clustering \\
+\texttt{hallucination\_discrim.py} & 79 & TF-IDF + LogReg binary classifier \\
 \midrule
-\textbf{Total} & \textbf{4,690} & \\
+\textbf{Total} & \textbf{5,336} & \\
 \bottomrule
 \end{tabularx}
 \end{table}
