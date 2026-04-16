@@ -306,32 +306,59 @@ function verdictIcon(v) {
   return '<span class="vf-icon vf-icon-gray">-</span>';
 }
 
+let dashDragging = false, dashDragSX = 0, dashDragSY = 0, dashStartX = 0, dashStartY = 0, dashPositioned = false;
+
 function renderDashboard() {
   if (!panelEl) {
     panelEl = document.createElement("div");
     panelEl.className = "vf-dashboard";
     document.body.appendChild(panelEl);
+    dashPositioned = false;
+
     panelEl.addEventListener("click", (e) => {
       if (e.target.classList.contains("vf-close")) {
         panelVisible = false;
         panelEl.classList.remove("show");
-        setTimeout(() => { if (panelEl && !panelVisible) { panelEl.remove(); panelEl = null; } }, 300);
+        setTimeout(() => { if (panelEl && !panelVisible) { panelEl.remove(); panelEl = null; dashPositioned = false; } }, 300);
       }
     });
+
+    // Make dashboard draggable via header area
+    panelEl.addEventListener("mousedown", (e) => {
+      const header = panelEl.querySelector(".vf-dash-header");
+      if (!header || !header.contains(e.target)) return;
+      if (e.target.tagName === "A") return; // don't block logo click
+      dashDragging = true;
+      dashDragSX = e.clientX; dashDragSY = e.clientY;
+      const r = panelEl.getBoundingClientRect();
+      dashStartX = r.left; dashStartY = r.top;
+      panelEl.style.transition = "none";
+      e.preventDefault();
+    });
+    document.addEventListener("mousemove", (e) => {
+      if (!dashDragging) return;
+      panelEl.style.left = Math.max(0, dashStartX + e.clientX - dashDragSX) + "px";
+      panelEl.style.top = Math.max(0, dashStartY + e.clientY - dashDragSY) + "px";
+      panelEl.style.right = "auto"; panelEl.style.bottom = "auto";
+    });
+    document.addEventListener("mouseup", () => { if (dashDragging) { dashDragging = false; panelEl.style.transition = ""; } });
   }
 
-  // Position near beacon
-  const br = beacon.getBoundingClientRect();
-  const dw = 380, maxH = innerHeight * 0.75;
-  let left = br.left - dw - 12;
-  if (left < 8) left = br.right + 12;
-  if (left + dw > innerWidth - 8) left = innerWidth - dw - 8;
-  let top = br.top - maxH / 2 + 28;
-  top = Math.max(8, Math.min(top, innerHeight - maxH - 8));
-  panelEl.style.left = left + "px";
-  panelEl.style.top = top + "px";
-  panelEl.style.right = "auto";
-  panelEl.style.bottom = "auto";
+  // Position near beacon only on first open
+  if (!dashPositioned) {
+    const br = beacon.getBoundingClientRect();
+    const dw = 400, maxH = innerHeight * 0.8;
+    let left = br.left - dw - 14;
+    if (left < 8) left = br.right + 14;
+    if (left + dw > innerWidth - 8) left = innerWidth - dw - 8;
+    let top = br.top - maxH / 2 + 28;
+    top = Math.max(8, Math.min(top, innerHeight - maxH - 8));
+    panelEl.style.left = left + "px";
+    panelEl.style.top = top + "px";
+    panelEl.style.right = "auto";
+    panelEl.style.bottom = "auto";
+    dashPositioned = true;
+  }
 
   const tc = allResults.reduce((s, r) => s + (r.total_claims || 0), 0);
   const sup = allResults.reduce((s, r) => s + (r.supported || 0), 0);
@@ -428,10 +455,11 @@ function showPromptTip(data) {
 
   const improvHtml = data.improvements.slice(0, 3).map((i) => `<div class="vf-pt-item">${i.replace(/</g, "&lt;")}</div>`).join("");
   promptTip.innerHTML = `
-    <div class="vf-pt-header">
+    <div class="vf-pt-drag-handle">
       <span class="vf-pt-logo">VF</span>
       <span class="vf-pt-title">Prompt Suggestion</span>
       <span class="vf-pt-score">${data.score || 0}/100</span>
+      <button class="vf-pt-close" title="Close">&times;</button>
     </div>
     ${improvHtml}
     ${lastSuggestedPrompt ? `<div class="vf-pt-suggested">${lastSuggestedPrompt.replace(/</g, "&lt;").substring(0, 300)}</div>` : ""}
@@ -440,6 +468,33 @@ function showPromptTip(data) {
       <button class="vf-pt-dismiss" data-action="dismiss">Use Original</button>
     </div>
   `;
+
+  // Close X button
+  promptTip.querySelector(".vf-pt-close")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    hidePromptTip();
+  });
+
+  // Make prompt tip draggable via header
+  const dragHandle = promptTip.querySelector(".vf-pt-drag-handle");
+  let ptDragging = false, ptDragSX = 0, ptDragSY = 0, ptStartX = 0, ptStartY = 0;
+  dragHandle.addEventListener("mousedown", (e) => {
+    if (e.target.classList.contains("vf-pt-close")) return;
+    ptDragging = true;
+    ptDragSX = e.clientX; ptDragSY = e.clientY;
+    const r = promptTip.getBoundingClientRect();
+    ptStartX = r.left; ptStartY = r.top;
+    promptTip.style.transition = "none";
+    e.preventDefault();
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!ptDragging) return;
+    promptTip.style.left = Math.max(0, ptStartX + e.clientX - ptDragSX) + "px";
+    promptTip.style.top = Math.max(0, ptStartY + e.clientY - ptDragSY) + "px";
+    promptTip.style.bottom = "auto";
+    promptTip.style.right = "auto";
+  });
+  document.addEventListener("mouseup", () => { if (ptDragging) { ptDragging = false; promptTip.style.transition = ""; } });
 
   // Button handlers
   promptTip.querySelector(".vf-pt-accept")?.addEventListener("click", () => {
@@ -450,7 +505,6 @@ function showPromptTip(data) {
       } else {
         el.value = lastSuggestedPrompt;
       }
-      // Trigger input event so chatbot UI picks up the change
       el.dispatchEvent(new Event("input", { bubbles: true }));
     }
     hidePromptTip();

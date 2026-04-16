@@ -5,27 +5,33 @@
 
 /* ── Glass Design Tokens ─────────────────────────────── */
 :root {
-  --glass-bg: rgba(255,255,255,0.12);
-  --glass-bg-hover: rgba(255,255,255,0.18);
-  --glass-border: rgba(255,255,255,0.35);
-  --glass-border-hover: rgba(255,255,255,0.5);
-  --glass-blur: blur(20px);
-  --glass-blur-heavy: blur(40px);
-  --glass-shadow: 0 8px 32px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -1px 0 rgba(0,0,0,0.08);
-  --glass-shadow-deep: 0 12px 48px rgba(0,0,0,0.18), inset 0 2px 0 rgba(255,255,255,0.7), inset 0 -1px 2px rgba(0,0,0,0.1);
-  --glass-shadow-press: inset 0 3px 8px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+  --glass-bg: rgba(255,255,255,0.14);
+  --glass-bg-hover: rgba(255,255,255,0.22);
+  --glass-border: rgba(255,255,255,0.4);
+  --glass-border-hover: rgba(255,255,255,0.6);
+  --glass-blur: blur(24px);
+  --glass-blur-heavy: blur(50px);
+  --glass-shadow: 0 8px 32px rgba(0,0,0,0.15), inset 0 1.5px 0 rgba(255,255,255,0.7), inset 0 -1px 0 rgba(0,0,0,0.1);
+  --glass-shadow-deep: 0 16px 56px rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.8), inset 0 -1px 3px rgba(0,0,0,0.12);
+  --glass-shadow-press: inset 0 3px 8px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.1);
+  --glass-glow: 0 0 20px rgba(99,102,241,0.15), 0 0 60px rgba(99,102,241,0.05);
   --glass-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --glass-ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --primary: rgba(99,102,241,0.75);
-  --danger: rgba(239,68,68,0.6);
-  --success: rgba(34,197,94,0.6);
-  --warning: rgba(245,158,11,0.6);
+  --primary: rgba(99,102,241,0.8);
+  --danger: rgba(239,68,68,0.65);
+  --success: rgba(34,197,94,0.65);
+  --warning: rgba(245,158,11,0.65);
   --text-primary: #fff;
   --text-muted: rgba(255,255,255,0.6);
   --radius-pill: 999px;
   --radius-card: 20px;
   --radius-modal: 24px;
 }
+
+/* Subtle floating animation for glass elements */
+@keyframes vfFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+@keyframes vfShimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+@keyframes vfGlowPulse { 0%,100%{box-shadow: var(--glass-shadow), var(--glass-glow)} 50%{box-shadow: var(--glass-shadow-deep), 0 0 30px rgba(99,102,241,0.2)} }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -103,8 +109,8 @@
 
 /* ── Beacon States ───────────────────────────────────── */
 
-.verifact-beacon.idle       { background: linear-gradient(155deg, rgba(99,102,241,0.4), rgba(79,82,221,0.55)); }
-.verifact-beacon.idle::after { border-color: rgba(99,102,241,0.3); }
+.verifact-beacon.idle       { background: linear-gradient(155deg, rgba(99,102,241,0.45), rgba(79,82,221,0.6)); animation: vfGlowPulse 3s ease-in-out infinite; }
+.verifact-beacon.idle::after { border-color: rgba(99,102,241,0.4); }
 
 .verifact-beacon.analyzing  { background: linear-gradient(155deg, rgba(168,85,247,0.4), rgba(139,92,246,0.55)); }
 .verifact-beacon.analyzing::after { border-color: rgba(168,85,247,0.4); animation-duration: 1.2s; }
@@ -146,11 +152,11 @@
   max-height: 80vh;
   overflow-y: auto;
   padding: 24px 20px 16px;
-  background: rgba(18, 18, 28, 0.65);
-  border: 1px solid rgba(255,255,255,0.15);
-  backdrop-filter: var(--glass-blur-heavy) saturate(200%);
-  -webkit-backdrop-filter: var(--glass-blur-heavy) saturate(200%);
-  box-shadow: var(--glass-shadow-deep);
+  background: rgba(18, 18, 28, 0.55);
+  border: 1.5px solid rgba(255,255,255,0.2);
+  backdrop-filter: var(--glass-blur-heavy) saturate(220%) brightness(1.05);
+  -webkit-backdrop-filter: var(--glass-blur-heavy) saturate(220%) brightness(1.05);
+  box-shadow: var(--glass-shadow-deep), var(--glass-glow);
   color: var(--text-primary);
 }
 
@@ -202,8 +208,9 @@
   background: linear-gradient(135deg, rgba(255,255,255,0.5) 0%, transparent 60%);
   pointer-events: none;
 }
-.vf-logo:hover { transform: scale(1.08); box-shadow: var(--glass-shadow-deep); }
+.vf-logo:hover { transform: scale(1.08); box-shadow: var(--glass-shadow-deep), 0 0 16px rgba(99,102,241,0.2); }
 .vf-logo:active { transform: scale(0.95); box-shadow: var(--glass-shadow-press); }
+.vf-logo { animation: vfFloat 4s ease-in-out infinite; }
 .vf-logo-img { width: 34px; height: 34px; object-fit: contain; pointer-events: none; }
 
 .vf-title { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
@@ -350,6 +357,24 @@
   pointer-events: none;
 }
 .vf-prompt-tip.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+
+.vf-pt-drag-handle {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  cursor: grab; -webkit-user-select: none; user-select: none;
+  padding: 2px 0;
+}
+.vf-pt-drag-handle:active { cursor: grabbing; }
+
+.vf-pt-close {
+  margin-left: auto; width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.5); font-size: 14px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s var(--glass-ease); padding: 0; line-height: 1;
+}
+.vf-pt-close:hover { background: rgba(255,255,255,0.18); color: #fff; transform: scale(1.1); }
+.vf-pt-close:active { transform: scale(0.9); }
 
 .vf-pt-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .vf-pt-logo {
