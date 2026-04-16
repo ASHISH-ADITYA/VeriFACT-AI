@@ -109,39 +109,41 @@
   overflow-y: auto;
   padding: 22px 18px 14px;
 
-  /* Liquid glass: almost clear with prismatic tint */
+  /* Liquid glass — dark translucent like reference image */
   background: linear-gradient(
     165deg,
-    rgba(255, 255, 255, 0.42) 0%,
-    rgba(240, 245, 255, 0.35) 30%,
-    rgba(245, 240, 255, 0.3) 60%,
-    rgba(240, 255, 250, 0.32) 100%
+    rgba(60, 55, 75, 0.55) 0%,
+    rgba(50, 50, 70, 0.5) 30%,
+    rgba(55, 50, 65, 0.48) 60%,
+    rgba(45, 55, 65, 0.52) 100%
   );
-  border: 0.5px solid rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(60px) saturate(220%) brightness(1.08);
-  -webkit-backdrop-filter: blur(60px) saturate(220%) brightness(1.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(80px) saturate(200%);
+  -webkit-backdrop-filter: blur(80px) saturate(200%);
   box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.12),
-    0 4px 16px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    inset 0 -0.5px 0 rgba(0, 0, 0, 0.04);
-  color: #1a1a2e;
+    0 24px 80px rgba(0, 0, 0, 0.3),
+    0 4px 16px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -0.5px 0 rgba(0, 0, 0, 0.2);
+  color: #e8e8f0;
 }
 
-/* Prismatic sheen on top edge */
+/* Prismatic rainbow sheen on top edge */
 .vf-dash-inner::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 1px;
+  height: 1.5px;
   background: linear-gradient(90deg,
-    transparent 5%,
-    rgba(180,140,255,0.4) 20%,
-    rgba(100,220,220,0.4) 40%,
-    rgba(255,180,200,0.3) 60%,
-    rgba(140,200,255,0.4) 80%,
-    transparent 95%
+    transparent 3%,
+    rgba(180,140,255,0.5) 15%,
+    rgba(100,230,220,0.5) 35%,
+    rgba(255,180,200,0.4) 55%,
+    rgba(140,200,255,0.5) 75%,
+    rgba(200,160,255,0.4) 90%,
+    transparent 97%
   );
+  z-index: 1;
 }
 
 /* Scrollbar */
@@ -156,19 +158,16 @@
   top: 10px; right: 12px;
   width: 26px; height: 26px;
   border-radius: 50%;
-  border: 0.5px solid rgba(0,0,0,0.08);
-  background: rgba(255,255,255,0.5);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: rgba(0,0,0,0.4);
+  border: 0.5px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.5);
   font-size: 16px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s ease;
   padding: 0; line-height: 1;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
-.vf-close:hover { background: rgba(255,255,255,0.75); color: rgba(0,0,0,0.6); }
+.vf-close:hover { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); }
 
 /* ── Header ──────────────────────────────────────────── */
 
@@ -202,12 +201,12 @@
   font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #1a1a2e;
+  color: #f0f0f5;
 }
 
 .vf-subtitle {
   font-size: 11px;
-  color: rgba(0,0,0,0.35);
+  color: rgba(255,255,255,0.35);
   letter-spacing: 0.02em;
   margin-top: 2px;
 }
@@ -225,29 +224,26 @@
   text-align: center;
   padding: 10px 4px;
   border-radius: 14px;
-  /* Glass pill */
-  background: rgba(255, 255, 255, 0.45);
-  border: 0.5px solid rgba(255, 255, 255, 0.6);
+  /* Glass pill — dark frosted */
+  background: rgba(255, 255, 255, 0.07);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -0.5px 0 rgba(0, 0, 0, 0.03);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .vf-kpi-val {
   font-size: 19px;
   font-weight: 800;
   line-height: 1.1;
-  color: #1a1a2e;
+  color: #f0f0f5;
 }
 
 .vf-kpi-lbl {
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: rgba(0,0,0,0.35);
+  color: rgba(255,255,255,0.4);
   margin-top: 2px;
 }
 
@@ -276,7 +272,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(0,0,0,0.35);
+  color: rgba(255,255,255,0.4);
   margin-bottom: 10px;
 }
 
@@ -287,35 +283,32 @@
 .vf-card {
   border-radius: 16px;
   padding: 13px;
-  /* Glass card */
-  background: rgba(255, 255, 255, 0.4);
-  border: 0.5px solid rgba(255, 255, 255, 0.55);
+  /* Dark frosted glass card */
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
   box-shadow:
-    0 3px 12px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -0.5px 0 rgba(0, 0, 0, 0.02);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+    0 3px 12px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: all 0.2s ease;
 }
 
 .vf-card:hover {
-  background: rgba(255, 255, 255, 0.55);
-  box-shadow: 0 5px 18px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.7);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 5px 18px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.1);
 }
 
-/* Colored left accent — glass-tinted */
+/* Colored left accent — glass tinted glow */
 .vf-card-red {
-  border-left: 3px solid rgba(220, 50, 50, 0.5);
-  background: linear-gradient(135deg, rgba(255,230,230,0.35), rgba(255,255,255,0.4));
+  border-left: 3px solid rgba(240, 80, 80, 0.6);
+  background: linear-gradient(135deg, rgba(240,80,80,0.08), rgba(255,255,255,0.04));
 }
 .vf-card-yellow {
-  border-left: 3px solid rgba(220, 160, 20, 0.5);
-  background: linear-gradient(135deg, rgba(255,245,220,0.35), rgba(255,255,255,0.4));
+  border-left: 3px solid rgba(240, 180, 40, 0.6);
+  background: linear-gradient(135deg, rgba(240,180,40,0.06), rgba(255,255,255,0.04));
 }
 .vf-card-green {
-  border-left: 3px solid rgba(20, 180, 100, 0.5);
-  background: linear-gradient(135deg, rgba(220,255,240,0.35), rgba(255,255,255,0.4));
+  border-left: 3px solid rgba(50, 200, 120, 0.6);
+  background: linear-gradient(135deg, rgba(50,200,120,0.06), rgba(255,255,255,0.04));
 }
 
 .vf-card-header {
@@ -331,59 +324,57 @@
   border-radius: 7px;
   align-items: center; justify-content: center;
   font-size: 11px; font-weight: 800;
-  /* Glass icon */
-  border: 0.5px solid rgba(255,255,255,0.5);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 2px 6px rgba(0,0,0,0.06);
+  border: 0.5px solid rgba(255,255,255,0.12);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
 }
 
-.vf-icon-red    { background: rgba(240,90,90,0.2); color: #dc2626; }
-.vf-icon-green  { background: rgba(50,200,120,0.2); color: #059669; }
-.vf-icon-yellow { background: rgba(240,180,50,0.2); color: #d97706; }
-.vf-icon-gray   { background: rgba(150,150,160,0.15); color: #6b7280; }
+.vf-icon-red    { background: rgba(240,80,80,0.25); color: #f87171; }
+.vf-icon-green  { background: rgba(52,211,153,0.25); color: #34d399; }
+.vf-icon-yellow { background: rgba(251,191,36,0.25); color: #fbbf24; }
+.vf-icon-gray   { background: rgba(156,163,175,0.15); color: #9ca3af; }
 
 .vf-card-verdict {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #1a1a2e;
+  color: rgba(255,255,255,0.85);
 }
 
 .vf-card-conf {
   margin-left: auto;
   font-size: 12px;
   font-weight: 700;
-  color: rgba(0,0,0,0.4);
+  color: rgba(255,255,255,0.45);
 }
 
 .vf-card-claim {
   font-size: 12.5px;
   line-height: 1.45;
-  color: rgba(0,0,0,0.75);
+  color: rgba(255,255,255,0.8);
   margin-bottom: 7px;
 }
 
 .vf-card-evidence {
   font-size: 10.5px;
   line-height: 1.4;
-  color: rgba(0,0,0,0.4);
+  color: rgba(255,255,255,0.45);
   padding: 7px 9px;
   border-radius: 10px;
   /* Inner glass inset */
-  background: rgba(255,255,255,0.45);
-  border: 0.5px solid rgba(255,255,255,0.5);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.04);
+  border: 0.5px solid rgba(255,255,255,0.08);
   margin-bottom: 5px;
 }
 
 .vf-card-ev-label {
   font-weight: 600;
-  color: rgba(0,0,0,0.55);
+  color: rgba(255,255,255,0.6);
 }
 
 .vf-card-source {
   font-size: 10px;
-  color: rgba(0,0,0,0.25);
+  color: rgba(255,255,255,0.25);
   font-style: italic;
 }
 
@@ -393,11 +384,10 @@
   text-align: center;
   padding: 22px 14px;
   font-size: 12.5px;
-  color: rgba(0,0,0,0.35);
+  color: rgba(255,255,255,0.4);
   border-radius: 14px;
   background: rgba(50,200,120,0.06);
-  border: 0.5px solid rgba(50,200,120,0.15);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+  border: 0.5px solid rgba(50,200,120,0.1);
 }
 
 /* ── Footer ──────────────────────────────────────────── */
@@ -405,7 +395,7 @@
 .vf-footer {
   text-align: center;
   font-size: 9px;
-  color: rgba(0,0,0,0.2);
+  color: rgba(255,255,255,0.2);
   margin-top: 10px;
   letter-spacing: 0.02em;
 }
