@@ -25,6 +25,7 @@ from utils.helpers import logger, timed
 if TYPE_CHECKING:
     from config import Config
     from core.claim_decomposer import Claim
+    from core.llm_client import LLMClient
 
 
 @dataclass
@@ -56,8 +57,9 @@ class VerdictEngine:
     # DeBERTa label order: 0=contradiction, 1=neutral, 2=entailment
     _LABEL_IDX = {"contradiction": 0, "neutral": 1, "entailment": 2}
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, llm_client: LLMClient | None = None) -> None:
         self.config = config
+        self.llm_client = llm_client
         nc = config.nli
 
         logger.info(f"Loading NLI model: {nc.model_name}")
@@ -279,6 +281,48 @@ class VerdictEngine:
 
         return [v for v in verdicts if v is not None]  # type: ignore[misc]
 
+    def _llm_verify_claim(self, claim_text: str, evidence_text: str) -> bool | None:
+        """Ask the LLM whether evidence specifically addresses the claim.
+
+        Returns True if the LLM says YES, False if NO, or None if the LLM
+        is unavailable or the call fails (so the caller can skip the step).
+        """
+        if self.llm_client is None:
+            return None
+
+        # Skip when provider is "none" (spaCy-only mode)
+        if getattr(self.llm_client, "config", None) and self.llm_client.config.provider == "none":
+            return None
+
+        system_prompt = "You are a fact-checker. Answer ONLY \"YES\" or \"NO\"."
+        user_prompt = (
+            "Does the following evidence specifically verify or mention the claim?\n\n"
+            f"Claim: {claim_text}\n"
+            f"Evidence: {evidence_text}\n\n"
+            "Does this evidence specifically address this exact claim? Answer YES or NO only."
+        )
+
+        try:
+            response = self.llm_client.generate(
+                user=user_prompt,
+                system=system_prompt,
+                temperature=0.0,
+                max_tokens=50,
+            )
+            if response is None:
+                return None
+            answer = response.strip().upper()
+            if "YES" in answer:
+                return True
+            if "NO" in answer:
+                return False
+            # Ambiguous response — treat as unavailable
+            logger.warning(f"LLM verify got ambiguous response: {response!r}")
+            return None
+        except Exception as exc:
+            logger.warning(f"LLM verify call failed, skipping: {exc}")
+            return None
+
     def _apply_verdict_logic(
         self, claim: Claim, evidence_list: list[Evidence], nli_results: list[NLIResult]
     ) -> Verdict:
@@ -327,6 +371,20 @@ class VerdictEngine:
         )
         avg_similarity = sum(r.evidence.similarity for r in nli_results) / max(len(nli_results), 1)
 
+        # ── LLM-as-judge: verify ambiguous NLI in the 0.35-0.65 zone ──
+        if (
+            0.35 <= max_raw_ent <= 0.65
+            and has_wiki_evidence
+            and getattr(self, "llm_client", None) is not None
+        ):
+            llm_answer = self._llm_verify_claim(claim.text, best_support.evidence.text)
+            if llm_answer is False:
+                logger.info(
+                    f"LLM judge says evidence is NOT relevant for: {claim.text[:60]}"
+                )
+                max_raw_ent = 0.1
+                max_specific_ent = 0.0
+
         # ── CONTRADICTED: VERY strict — only rule-engine level certainty ──
         # Hard: NLI contradiction > 0.80 + beats entailment by wide margin + relevant evidence
         hard_contra = (
@@ -343,6 +401,29 @@ class VerdictEngine:
         wiki_confirms = has_wiki_evidence and best_wiki_sim > 0.45
         weak_support = max_similarity > 0.25 and max_con < 0.60
 
+        # ── Fix 2: Entity verification — strongest fabrication signal ──
+        # Check if the evidence retriever flagged unverified entities
+        entity_verified = True
+        unverified_entities: list[str] = []
+        for r in nli_results:
+            ev_flag = getattr(r.evidence, "entity_verified", None)
+            if ev_flag is not None:
+                entity_verified = ev_flag
+                unverified_entities = getattr(r.evidence, "unverified_entities", [])
+                break  # All evidence for a claim shares the same flags
+
+        # Entity does NOT exist on Wikipedia → very strong fabrication signal
+        entity_fabrication = (
+            not entity_verified
+            and len(unverified_entities) > 0
+        )
+
+        if entity_fabrication:
+            logger.info(
+                f"Entity verification FAILED for: {unverified_entities} "
+                f"in claim: {claim.text[:60]}"
+            )
+
         # ── Fabrication: Wikipedia has NOTHING about this specific topic ──
         has_specific_entity = bool(_re.search(r"[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}", claim.text))
         has_technical_term = bool(_re.search(
@@ -351,8 +432,9 @@ class VerdictEngine:
         ))
         evidence_is_irrelevant = max_similarity < 0.35 and avg_similarity < 0.25
 
-        # Fabrication ONLY if: no Wikipedia evidence AT ALL + specific named concept
-        is_likely_fabricated = (
+        # Fabrication if: entity doesn't exist on Wikipedia (strongest signal)
+        # OR: no Wikipedia evidence AT ALL + specific named concept (weaker signal)
+        is_likely_fabricated = entity_fabrication or (
             (has_specific_entity or has_technical_term)
             and not has_wiki_evidence
             and evidence_is_irrelevant
@@ -360,7 +442,12 @@ class VerdictEngine:
         )
 
         # ── Decision: FABRICATED → CONTRADICTED → SUPPORTED → UNVERIFIABLE ──
-        if is_likely_fabricated:
+        if entity_fabrication:
+            # Entity verification is the STRONGEST signal — overrides everything
+            # "Haldiram Novel Theory" has no Wikipedia article → fabricated
+            label = "CONTRADICTED"
+            best_ev = best_support.evidence
+        elif is_likely_fabricated:
             label = "CONTRADICTED"
             best_ev = best_support.evidence
         elif is_contradicted and not wiki_confirms:
@@ -394,7 +481,9 @@ class VerdictEngine:
         )
 
         # Boost confidence for fabrication — we're quite sure it's fake
-        if is_likely_fabricated:
+        if entity_fabrication:
+            confidence = max(confidence, 0.90)
+        elif is_likely_fabricated:
             confidence = max(confidence, 0.80)
 
         return Verdict(

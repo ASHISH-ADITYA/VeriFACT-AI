@@ -16,7 +16,10 @@ import json
 import os
 import re
 import threading
-from dataclasses import dataclass
+import urllib.error
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -44,6 +47,9 @@ class Evidence:
     url: str
     similarity: float
     chunk_id: int
+    # Entity verification flags (set by retriever)
+    entity_verified: bool | None = field(default=None, repr=False)
+    unverified_entities: list[str] = field(default_factory=list, repr=False)
 
 
 class EvidenceRetriever:
@@ -173,6 +179,146 @@ class EvidenceRetriever:
         return queries
 
     # ------------------------------------------------------------------
+    # Entity verification: check if Wikipedia has an exact-title article
+    # ------------------------------------------------------------------
+    _COMMON_PHRASES = frozenset({
+        "United States", "New York", "South America", "North America",
+        "European Union", "Middle East", "World War", "Nobel Prize",
+        "Prime Minister", "President Biden", "President Obama",
+        "High School", "Real Estate", "Social Media", "Machine Learning",
+        "Deep Learning", "Artificial Intelligence", "Computer Science",
+        "Natural Language", "Climate Change", "Global Warming",
+        "Big Bang", "Black Hole", "Dark Matter", "Dark Energy",
+        "Solar System", "Milky Way", "General Theory", "Special Theory",
+    })
+
+    @staticmethod
+    def _verify_entity_exists(entity_name: str) -> bool:
+        """Check if Wikipedia has an article with exactly this title.
+
+        Uses the MediaWiki query API with exact title lookup.
+        Returns True only if an article exists (no 'missing' key).
+        """
+        url = (
+            f"https://en.wikipedia.org/w/api.php?action=query"
+            f"&titles={urllib.parse.quote(entity_name)}"
+            f"&format=json&utf8=1"
+        )
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "VeriFACT-AI/1.0"})
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            pages = data.get("query", {}).get("pages", {})
+            for _page_id, page_info in pages.items():
+                return "missing" not in page_info
+            return False
+        except Exception:
+            # On network errors, return None-ish — don't block the pipeline
+            return True  # fail-open: assume it exists if we can't check
+
+    @staticmethod
+    def _extract_specific_entities(claim: str) -> list[str]:
+        """Extract specific named entities from a claim that could be fabricated.
+
+        Looks for:
+        - Quoted terms: "Haldiram Novel Theory"
+        - Capitalized multi-word phrases: Haldiram Novel Theory, Progressimic Algorithm
+        - Technical-sounding compound terms
+        """
+        entities: list[str] = []
+
+        # 1. Quoted terms
+        quoted = re.findall(r'"([^"]+)"', claim)
+        entities.extend(quoted)
+
+        # 2. Capitalized multi-word phrases (2+ consecutive capitalized words)
+        # Match sequences like "Haldiram Novel Theory", "Progressimic Algorithm"
+        cap_phrases = re.findall(r'(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)', claim)
+        for phrase in cap_phrases:
+            words = phrase.split()
+            # Skip very common phrases that are not entity names
+            if len(words) >= 2 and phrase not in EvidenceRetriever._COMMON_PHRASES:
+                entities.append(phrase)
+
+        # 3. Single capitalized word + technical suffix (e.g., "Progressimic Algorithm")
+        # Already covered by multi-word above
+
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        unique: list[str] = []
+        for e in entities:
+            if e.lower() not in seen:
+                seen.add(e.lower())
+                unique.append(e)
+
+        return unique
+
+    @staticmethod
+    def _check_title_relevance(claim: str, evidence_title: str) -> float:
+        """Check if a Wikipedia article title is actually relevant to the claim.
+
+        Returns a penalty multiplier (0.0 to 1.0).
+        1.0 = fully relevant, keep original similarity
+        Low value = irrelevant, should reduce similarity
+
+        The key check: if the claim mentions a specific concept like
+        "Haldiram Novel Theory", the Wikipedia article "Haldiram's" is NOT
+        about that theory — it's about a snack company.
+        """
+        # Extract key terms from the claim (excluding very common words)
+        stop = {
+            "the", "a", "an", "is", "was", "are", "were", "in", "on", "at",
+            "of", "to", "and", "or", "for", "by", "it", "its", "that", "this",
+            "with", "from", "as", "be", "has", "had", "not", "said", "says",
+            "about", "also", "been", "but", "can", "could", "did", "do",
+            "does", "each", "even", "get", "got", "have", "he", "her", "here",
+            "him", "his", "how", "into", "just", "know", "like", "make",
+            "many", "may", "more", "most", "much", "my", "new", "no", "now",
+            "only", "our", "out", "over", "own", "part", "per", "put",
+            "she", "so", "some", "still", "such", "take", "than", "their",
+            "them", "then", "there", "they", "too", "up", "us", "use",
+            "used", "very", "want", "way", "we", "well", "what", "when",
+            "where", "which", "while", "who", "why", "will", "would", "you",
+        }
+
+        claim_words = {w.lower() for w in re.findall(r'[A-Za-z]+', claim) if len(w) > 2}
+        claim_content = claim_words - stop
+
+        title_words = {w.lower() for w in re.findall(r'[A-Za-z]+', evidence_title) if len(w) > 2}
+
+        if not claim_content or not title_words:
+            return 1.0
+
+        # How many claim content words appear in the title?
+        overlap = claim_content & title_words
+        overlap_ratio = len(overlap) / max(len(claim_content), 1)
+
+        # If the title covers less than 40% of the claim's content words,
+        # it's probably about something else
+        if overlap_ratio < 0.3:
+            return 0.2  # Heavily penalize
+        if overlap_ratio < 0.5:
+            return 0.5  # Moderate penalty
+
+        return 1.0  # Relevant enough
+
+    def _verify_claim_entities(self, claim_text: str) -> tuple[bool, list[str]]:
+        """Verify all specific entities in a claim exist on Wikipedia.
+
+        Returns (all_verified, list_of_unverified_entity_names).
+        """
+        entities = self._extract_specific_entities(claim_text)
+        if not entities:
+            return True, []
+
+        unverified: list[str] = []
+        for entity in entities:
+            if not self._verify_entity_exists(entity):
+                unverified.append(entity)
+
+        return len(unverified) == 0, unverified
+
+    # ------------------------------------------------------------------
     @timed
     def retrieve(self, claim_text: str, top_k: int | None = None) -> list[Evidence]:
         """Hybrid retrieve with contradiction-aware query expansion: dense + BM25 + rerank."""
@@ -197,12 +343,29 @@ class EvidenceRetriever:
 
         reranked = self._rerank(claim_text, all_candidates, k)
 
+        # ── Entity verification: check if specific entities exist on Wikipedia ──
+        all_verified, unverified = self._verify_claim_entities(claim_text)
+
         # ALWAYS query live Wikipedia API (6.8M articles) for every claim
         # This ensures maximum evidence coverage — not just a fallback
         try:
             wiki_results = self._wiki_api_search(claim_text, max_results=3)
             if wiki_results:
                 logger.info(f"Wiki API: {len(wiki_results)} live results for: {claim_text[:50]}")
+                # ── Fix 3: Apply title relevance scoring to Wiki results ──
+                for i, wev in enumerate(wiki_results):
+                    relevance = self._check_title_relevance(claim_text, wev.title)
+                    if relevance < 1.0:
+                        wiki_results[i] = Evidence(
+                            text=wev.text,
+                            source=wev.source,
+                            title=wev.title,
+                            url=wev.url,
+                            similarity=round(wev.similarity * relevance, 3),
+                            chunk_id=wev.chunk_id,
+                            entity_verified=wev.entity_verified,
+                            unverified_entities=wev.unverified_entities,
+                        )
                 # Merge: keep local results + add wiki results, deduplicate by title
                 local_titles = {ev.title.lower() for ev in reranked}
                 for wev in wiki_results:
@@ -215,6 +378,11 @@ class EvidenceRetriever:
                 logger.info(f"Wiki API: 0 results — possible fabrication: {claim_text[:50]}")
         except Exception:
             pass  # fail silently — local results are still available
+
+        # ── Stamp entity verification results on all evidence ──
+        for ev in reranked:
+            ev.entity_verified = all_verified
+            ev.unverified_entities = unverified
 
         return reranked
 
@@ -338,10 +506,25 @@ class EvidenceRetriever:
                 )
                 for ev, score in scored_cands[:k]
             ]
+            # ── Entity verification for this claim ──
+            all_verified, unverified = self._verify_claim_entities(claims[i])
+
             # ALWAYS query Wikipedia API for every claim
             try:
                 wiki_ev = self._wiki_api_search(claims[i], max_results=2)
                 if wiki_ev:
+                    # ── Fix 3: Apply title relevance scoring ──
+                    for wi, wev in enumerate(wiki_ev):
+                        relevance = self._check_title_relevance(claims[i], wev.title)
+                        if relevance < 1.0:
+                            wiki_ev[wi] = Evidence(
+                                text=wev.text,
+                                source=wev.source,
+                                title=wev.title,
+                                url=wev.url,
+                                similarity=round(wev.similarity * relevance, 3),
+                                chunk_id=wev.chunk_id,
+                            )
                     local_titles = {ev.title.lower() for ev in reranked}
                     for wev in wiki_ev:
                         if wev.title.lower() not in local_titles:
@@ -350,6 +533,11 @@ class EvidenceRetriever:
                     reranked = reranked[:max(k, 5)]
             except Exception:
                 pass
+
+            # ── Stamp entity verification results on all evidence ──
+            for ev in reranked:
+                ev.entity_verified = all_verified
+                ev.unverified_entities = unverified
 
             results.append(reranked)
 
@@ -576,9 +764,6 @@ class EvidenceRetriever:
         finding paragraphs that contain the query's key terms.
         This gives deep evidence from ALL 6.8M English Wikipedia articles.
         """
-        import urllib.error
-        import urllib.request
-
         # Step 1: Search for relevant article titles
         search_url = (
             f"https://en.wikipedia.org/w/api.php?action=query&list=search"

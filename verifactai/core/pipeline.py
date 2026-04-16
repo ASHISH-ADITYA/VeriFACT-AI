@@ -60,7 +60,7 @@ class VeriFactPipeline:
         self.llm = LLMClient(self.config.llm)
         self.decomposer = ClaimDecomposer(self.llm)
         self.retriever = EvidenceRetriever(self.config)
-        self.verdict_engine = VerdictEngine(self.config)
+        self.verdict_engine = VerdictEngine(self.config, llm_client=self.llm)
         self.selfcheck = SelfCheckScorer(self.llm, self.config, verdict_engine=self.verdict_engine)
         self.annotator = AnnotatedOutputGenerator(
             llm=self.llm,
