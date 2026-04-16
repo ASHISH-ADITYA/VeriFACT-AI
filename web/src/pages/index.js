@@ -106,14 +106,18 @@ export default function Home() {
         {/* Header */}
         <header style={{ textAlign: "center", marginBottom: 24 }}>
           <div style={{
-            display: "inline-flex", width: 60, height: 60, borderRadius: 18,
-            background: "linear-gradient(135deg, rgba(0,210,211,0.25), rgba(76,175,80,0.2), rgba(255,193,7,0.15))",
-            border: "1.5px solid rgba(0,210,211,0.3)",
+            display: "inline-flex", width: 64, height: 64, borderRadius: 18,
+            background: "linear-gradient(145deg, rgba(30,120,180,0.7), rgba(0,180,200,0.6), rgba(40,100,200,0.75))",
+            border: "2.5px solid rgba(255,255,255,0.7)",
             backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-            alignItems: "center", justifyContent: "center", fontSize: 28,
+            alignItems: "center", justifyContent: "center",
+            fontSize: "1.6rem", fontWeight: 900, color: "#fff",
+            fontFamily: "'Inter', -apple-system, sans-serif",
+            letterSpacing: "-0.04em",
+            textShadow: "0 2px 8px rgba(0,80,150,0.4)",
             marginBottom: 10, animation: "float 3s ease-in-out infinite",
-            boxShadow: "0 8px 32px rgba(0,210,211,0.15)",
-          }}>{"\u{1F48E}"}</div>
+            boxShadow: "0 8px 32px rgba(0,120,180,0.25), inset 0 2px 0 rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.08), inset 3px 0 8px rgba(100,200,255,0.15), inset -3px 0 8px rgba(0,150,200,0.1)",
+          }}>VF</div>
           <h1 style={{
             fontSize: "2.4rem", fontWeight: 800, letterSpacing: "-0.03em",
             background: "linear-gradient(135deg, #00897b, #00bcd4, #4caf50, #ffc107)",
