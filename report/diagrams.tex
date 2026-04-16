@@ -1,0 +1,459 @@
+% ============================================================
+% VeriFACT AI — 10 TikZ Diagrams (Native LaTeX, no external images)
+% Include this file in the main report with: \input{diagrams}
+% Requires: \usepackage{tikz}
+%           \usetikzlibrary{positioning, arrows.meta, shapes.geometric,
+%                           fit, backgrounds, calc, decorations.pathreplacing}
+% ============================================================
+
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, shapes.geometric, fit, backgrounds, calc, decorations.pathreplacing, chains}
+
+% ── Shared styles ─────────────────────────────────────
+\tikzset{
+    % Boxes
+    clientbox/.style={draw, rounded corners=4pt, fill=blue!8, minimum width=3cm, minimum height=0.8cm, font=\small, align=center},
+    apibox/.style={draw, rounded corners=4pt, fill=purple!8, minimum width=2.5cm, minimum height=0.7cm, font=\small, align=center},
+    pipebox/.style={draw, rounded corners=4pt, fill=green!8, minimum width=3cm, minimum height=0.8cm, font=\small, align=center},
+    databox/.style={draw, rounded corners=4pt, fill=orange!8, minimum width=2.5cm, minimum height=0.7cm, font=\small, align=center},
+    modelbox/.style={draw, rounded corners=4pt, fill=red!8, minimum width=2.5cm, minimum height=0.7cm, font=\small, align=center},
+    extbox/.style={draw, rounded corners=4pt, fill=green!5, minimum width=2.5cm, minimum height=0.7cm, font=\small, align=center},
+    % Decision
+    decision/.style={draw, diamond, fill=yellow!10, minimum width=1.5cm, minimum height=0.8cm, font=\small, align=center, inner sep=1pt},
+    % Result
+    supported/.style={draw, rounded corners=3pt, fill=green!15, font=\small, align=center},
+    contradicted/.style={draw, rounded corners=3pt, fill=red!15, font=\small, align=center},
+    unverifiable/.style={draw, rounded corners=3pt, fill=yellow!15, font=\small, align=center},
+    % Arrows
+    myarrow/.style={-{Stealth[length=2.5mm]}, thick},
+    dasharrow/.style={-{Stealth[length=2.5mm]}, thick, dashed},
+    % Labels
+    lbl/.style={font=\scriptsize, midway},
+    % Tier background
+    tierbox/.style={draw, dashed, rounded corners=6pt, inner sep=8pt},
+}
+
+% ════════════════════════════════════════════════════════
+% DIAGRAM 1: System Architecture (4-tier)
+% ════════════════════════════════════════════════════════
+\newcommand{\DiagramArchitecture}{%
+\begin{tikzpicture}[node distance=0.5cm and 0.4cm, font=\small]
+
+% ── Client Layer ──
+\node[clientbox] (ext) {Chrome Extension\\(Manifest V3)};
+\node[clientbox, right=0.6cm of ext] (web) {Web Dashboard\\(Next.js 15.5.15)};
+\node[clientbox, right=0.6cm of web] (stm) {Streamlit\\(app.py)};
+
+\begin{scope}[on background layer]
+\node[tierbox, fill=blue!3, fit=(ext)(web)(stm), label={[font=\small\bfseries]above:Client Layer}] (clienttier) {};
+\end{scope}
+
+% ── API Layer ──
+\node[apibox, below=1.2cm of ext] (af) {/analyze/fast\\3--8\,s};
+\node[apibox, right=0.3cm of af] (an) {/analyze\\10--18\,s};
+\node[apibox, right=0.3cm of an] (as) {/stream\\SSE};
+\node[apibox, right=0.3cm of as] (op) {/optimize\\$<$1\,s};
+\node[apibox, right=0.3cm of op] (he) {/health};
+
+\begin{scope}[on background layer]
+\node[tierbox, fill=purple!3, fit=(af)(an)(as)(op)(he), label={[font=\small\bfseries]above:API Layer (overlay\_server.py)}] (apitier) {};
+\end{scope}
+
+% ── Pipeline Layer ──
+\node[pipebox, below=1.2cm of af] (s1) {Stage 1\\Claim Decomposer};
+\node[pipebox, right=0.3cm of s1] (s2) {Stage 2a\\Rule Engine\\(205 facts)};
+\node[pipebox, right=0.3cm of s2] (s3) {Stage 2b\\Evidence\\Retriever};
+\node[pipebox, below=0.5cm of s1] (s4) {Stage 3\\DeBERTa NLI};
+\node[pipebox, right=0.3cm of s4] (s5) {Stage 4--5\\SelfCheck +\\Confidence};
+\node[pipebox, right=0.3cm of s5] (s6) {Stage 6\\Annotator};
+
+\begin{scope}[on background layer]
+\node[tierbox, fill=green!3, fit=(s1)(s2)(s3)(s4)(s5)(s6), label={[font=\small\bfseries]above:Pipeline Layer (pipeline.py)}] (pipetier) {};
+\end{scope}
+
+% ── Data Layer ──
+\node[databox, below=1.2cm of s4] (faiss) {FAISS\\11K vectors\\384-dim};
+\node[databox, right=0.3cm of faiss] (bm25) {BM25\\In-memory};
+\node[databox, right=0.3cm of bm25] (wiki) {Wikipedia API\\6.8M articles};
+\node[databox, right=0.3cm of wiki] (rules) {Rule DB\\205 entries};
+\node[modelbox, left=0.3cm of faiss] (deb) {DeBERTa-v3\\435\,MB};
+
+\begin{scope}[on background layer]
+\node[tierbox, fill=orange!3, fit=(deb)(faiss)(bm25)(wiki)(rules), label={[font=\small\bfseries]above:Data \& Model Layer}] (datatier) {};
+\end{scope}
+
+% ── Arrows ──
+\draw[myarrow] (ext) -- (af);
+\draw[myarrow] (web) -- (an);
+\draw[myarrow] (an) -- (s1);
+\draw[myarrow] (af) -- (s1);
+\draw[myarrow] (s1) -- (s2);
+\draw[myarrow] (s2) -- (s3);
+\draw[myarrow] (s3) -- (s4);
+\draw[myarrow] (s4) -- (s5);
+\draw[myarrow] (s5) -- (s6);
+\draw[dasharrow] (s3) -- (faiss);
+\draw[dasharrow] (s3) -- (bm25);
+\draw[dasharrow] (s3) -- (wiki);
+\draw[dasharrow] (s4) -- (deb);
+\draw[dasharrow] (s2) -- (rules);
+
+\end{tikzpicture}
+}
+
+% ════════════════════════════════════════════════════════
+% DIAGRAM 2: 6-Stage Pipeline Flow
+% ════════════════════════════════════════════════════════
+\newcommand{\DiagramPipeline}{%
+\begin{tikzpicture}[node distance=0.6cm, font=\small]
+
+\node[draw, rounded corners, fill=gray!10, minimum width=4cm] (input) {User Text (LLM Response)};
+
+\node[pipebox, below=0.6cm of input, minimum width=4cm] (s1) {Stage 1: Claim Decomposer\\Groq 70B / spaCy fallback\\Max 8 (fast) or 20 (full) claims};
+
+\node[pipebox, below=0.6cm of s1, minimum width=4cm, fill=yellow!10] (s2a) {Stage 2a: Rule Engine\\205 facts, 9 categories\\$<$1\,ms per claim};
+
+\node[pipebox, below=0.6cm of s2a, minimum width=4cm] (s2b) {Stage 2b: Evidence Retrieval\\FAISS + BM25 + RRF (k=60)\\+ Reranker + Wikipedia API (6.8M)\\+ Entity Verification};
+
+\node[pipebox, below=0.6cm of s2b, minimum width=4cm, fill=red!6] (s3) {Stage 3: NLI Verdict\\DeBERTa-v3-base (batch)\\Specificity gate ($s > 0.65$)\\Fabrication detection\\LLM-as-Judge};
+
+\node[pipebox, below=0.6cm of s3, minimum width=4cm] (s4) {Stage 4: SelfCheck\\5-sample consistency\\Semantic entropy\\NLI cross-evidence fallback};
+
+\node[pipebox, below=0.6cm of s4, minimum width=4cm] (s5) {Stage 5: Confidence Fusion\\$C = \sigma(\sum w_i \cdot s_i)$\\5 signals, weights sum to 1.0};
+
+\node[pipebox, below=0.6cm of s5, minimum width=4cm] (s6) {Stage 6: Annotator\\JSON + HTML output\\Reflexion + Constitutional};
+
+\node[draw, rounded corners, fill=gray!10, below=0.6cm of s6, minimum width=4cm] (output) {Response: verdicts + confidence + evidence};
+
+% Arrows
+\draw[myarrow] (input) -- (s1);
+\draw[myarrow] (s1) -- (s2a);
+\draw[myarrow] (s2a) -- node[lbl, right, text width=2.5cm] {unresolved claims only} (s2b);
+\draw[myarrow] (s2b) -- (s3);
+\draw[myarrow] (s3) -- (s4);
+\draw[myarrow] (s4) -- (s5);
+\draw[myarrow] (s5) -- (s6);
+\draw[myarrow] (s6) -- (output);
+
+% Rule shortcut
+\draw[myarrow, red!70!black] (s2a.east) -- ++(2,0) |- node[lbl, right, pos=0.25] {\textcolor{red}{CONTRADICTED (0.95)}} (s6.east);
+
+\end{tikzpicture}
+}
+
+% ════════════════════════════════════════════════════════
+% DIAGRAM 3: Chrome Extension Architecture
+% ════════════════════════════════════════════════════════
+\newcommand{\DiagramExtension}{%
+\begin{tikzpicture}[node distance=0.5cm and 0.6cm, font=\small]
+
+\node[clientbox, minimum width=5cm] (dom) {Chatbot DOM\\(ChatGPT / Claude / Gemini / Grok)};
+\node[clientbox, minimum width=5cm, below=0.4cm of dom] (input) {User Input Field};
+
+\node[pipebox, right=1.5cm of dom, minimum width=3.5cm] (cs) {content.js\\MutationObserver\\3 parallel analyzers};
+\node[pipebox, below=0.4cm of cs, minimum width=3.5cm] (beacon) {Beacon (72px)\\Draggable glass orb\\Blue/Purple/Green/Red};
+\node[pipebox, below=0.4cm of beacon, minimum width=3.5cm] (dash) {Dashboard\\KPI + Claim cards\\VF logo $\rightarrow$ website};
+\node[pipebox, below=0.4cm of dash, minimum width=3.5cm] (prompt) {Prompt Suggestion\\Accept / Dismiss / Close};
+
+\node[extbox, right=1.5cm of cs, minimum width=3cm] (api) {HF Space API\\POST /analyze/fast};
+\node[extbox, below=0.5cm of api, minimum width=3cm] (opt) {POST /optimize};
+
+% Arrows
+\draw[myarrow] (dom) -- node[lbl, above] {detect text} (cs);
+\draw[myarrow] (cs) -- node[lbl, above] {POST} (api);
+\draw[myarrow] (api) -- node[lbl, below] {JSON} (cs);
+\draw[myarrow] (cs) -- node[lbl, left] {update} (beacon);
+\draw[myarrow] (cs) -- (dash);
+\draw[myarrow] (cs.south west) -- node[lbl, left] {highlights} (dom.east);
+\draw[myarrow] (input) -| (prompt);
+\draw[myarrow] (prompt) -- (opt);
+\draw[dasharrow] (prompt.west) -- node[lbl, below] {insert} (input.east);
+
+\end{tikzpicture}
+}
+
+% ════════════════════════════════════════════════════════
+% DIAGRAM 4: Hybrid Evidence Retrieval
+% ════════════════════════════════════════════════════════
+\newcommand{\DiagramRetrieval}{%
+\begin{tikzpicture}[node distance=0.5cm and 0.3cm, font=\small]
+
+\node[draw, rounded corners, fill=gray!10] (claim) {Claim text};
+
+\node[pipebox, below left=0.8cm and 1cm of claim] (dense) {Dense: MiniLM-L6\\384-dim encode\\$\rightarrow$ FAISS search};
+\node[pipebox, below right=0.8cm and 1cm of claim] (sparse) {Sparse: BM25\\Tokenize + score};
+
+\node[pipebox, below=1.8cm of claim, minimum width=4cm] (rrf) {Reciprocal Rank Fusion\\$\text{RRF}(d) = \sum \frac{1}{60 + \text{rank}_i(d)}$};
+
+\node[pipebox, below=0.5cm of rrf, minimum width=4cm] (rerank) {Cross-Encoder Rerank\\ms-marco-MiniLM-L-6-v2\\Sigmoid normalization};
+
+\node[pipebox, below left=0.8cm and -0.5cm of rerank, minimum width=3.5cm, fill=purple!8] (wikiapi) {Wikipedia API\\6.8M articles\\Full-text paragraph scoring\\Best 2 paragraphs (800 chars)};
+
+\node[pipebox, below right=0.8cm and -0.5cm of rerank, minimum width=3cm, fill=purple!8] (entity) {Entity Verification\\Exact title check\\EXISTS or MISSING};
+
+\node[pipebox, below=2.8cm of rerank, minimum width=4.5cm] (merge) {Merge local + wiki\\Deduplicate by title\\Sort by similarity\\Top-5 evidence};
+
+% Arrows
+\draw[myarrow] (claim) -- (dense);
+\draw[myarrow] (claim) -- (sparse);
+\draw[myarrow] (dense) -- (rrf);
+\draw[myarrow] (sparse) -- (rrf);
+\draw[myarrow] (rrf) -- (rerank);
+\draw[myarrow] (rerank) -- (wikiapi);
+\draw[myarrow] (rerank) -- (entity);
+\draw[myarrow] (wikiapi) -- (merge);
+\draw[myarrow] (entity) -- (merge);
+
+\end{tikzpicture}
+}
+
+% ════════════════════════════════════════════════════════
+% DIAGRAM 5: NLI Verdict Decision Tree
+% ════════════════════════════════════════════════════════
+\newcommand{\DiagramVerdict}{%
+\begin{tikzpicture}[node distance=0.5cm, font=\small,
+    every node/.style={align=center}]
+
+\node[draw, rounded corners, fill=gray!10] (input) {Claim + Evidence\\+ NLI results};
+
+\node[decision, below=0.5cm of input] (rule) {Rule\\match?};
+\node[contradicted, right=2cm of rule] (rule_yes) {CONTRADICTED\\0.95 conf\\(rule engine)};
+
+\node[decision, below=0.7cm of rule] (fab) {Entity\\fabricated?\\(no Wiki article)};
+\node[contradicted, right=2cm of fab] (fab_yes) {CONTRADICTED\\0.90 conf\\(fabricated)};
+
+\node[decision, below=0.7cm of fab] (hard) {Hard contra?\\NLI $>$ 0.80\\margin $>$ 0.20};
+
+\node[decision, below left=0.7cm and -0.5cm of hard] (wikitrust) {Wiki\\confirms?};
+\node[supported, left=1.5cm of wikitrust] (wiki_sup) {SUPPORTED\\(Wiki trust)};
+\node[contradicted, below=0.5cm of wikitrust] (hard_yes) {CONTRADICTED\\(NLI-based)};
+
+\node[decision, below right=0.7cm and -0.5cm of hard] (strong) {Strong/Mod\\support?};
+\node[supported, right=1.5cm of strong] (sup) {SUPPORTED};
+
+\node[decision, below=0.5cm of strong] (weak) {Weak\\support?};
+\node[supported, right=1.5cm of weak] (sup2) {SUPPORTED};
+\node[unverifiable, below=0.5cm of weak] (unver) {UNVERIFIABLE};
+
+% Arrows
+\draw[myarrow] (input) -- (rule);
+\draw[myarrow] (rule) -- node[lbl, above] {yes} (rule_yes);
+\draw[myarrow] (rule) -- node[lbl, right] {no} (fab);
+\draw[myarrow] (fab) -- node[lbl, above] {yes} (fab_yes);
+\draw[myarrow] (fab) -- node[lbl, right] {no} (hard);
+\draw[myarrow] (hard) -- node[lbl, left] {yes} (wikitrust);
+\draw[myarrow] (wikitrust) -- node[lbl, above] {yes} (wiki_sup);
+\draw[myarrow] (wikitrust) -- node[lbl, right] {no} (hard_yes);
+\draw[myarrow] (hard) -- node[lbl, right] {no} (strong);
+\draw[myarrow] (strong) -- node[lbl, above] {yes} (sup);
+\draw[myarrow] (strong) -- node[lbl, right] {no} (weak);
+\draw[myarrow] (weak) -- node[lbl, above] {yes} (sup2);
+\draw[myarrow] (weak) -- node[lbl, right] {no} (unver);
+
+\end{tikzpicture}
+}
+
+% ════════════════════════════════════════════════════════
+% DIAGRAM 6: Bayesian Confidence Fusion (5 signals)
+% ════════════════════════════════════════════════════════
+\newcommand{\DiagramConfidence}{%
+\begin{tikzpicture}[node distance=0.3cm, font=\small]
+
+\node[draw, rounded corners, fill=blue!8, minimum width=5cm] (s1) {$s_1$: NLI support ($w = 0.32$)\\$(\max(\text{ent}) - \max(\text{con}) + 1) / 2$};
+\node[draw, rounded corners, fill=blue!8, minimum width=5cm, below=0.3cm of s1] (s2) {$s_2$: Retrieval relevance ($w = 0.22$)\\$\max(\text{evidence.similarity})$};
+\node[draw, rounded corners, fill=blue!8, minimum width=5cm, below=0.3cm of s2] (s3) {$s_3$: Source reliability ($w = 0.12$)\\Wikipedia $= 1.0$, unknown $= 0.5$};
+\node[draw, rounded corners, fill=blue!8, minimum width=5cm, below=0.3cm of s3] (s4) {$s_4$: Cross-reference ($w = 0.16$)\\fraction(ent $>$ con)};
+\node[draw, rounded corners, fill=blue!8, minimum width=5cm, below=0.3cm of s4] (s5) {$s_5$: Uncertainty stability ($w = 0.18$)\\$1 - (0.65 \cdot H + 0.35 \cdot D)$};
+
+\node[draw, rounded corners, fill=purple!12, minimum width=4cm, minimum height=1cm, right=1.5cm of s3] (fusion) {$C = \sigma\!\left(\displaystyle\sum_{i=1}^{5} w_i \cdot s_i\right)$\\Bayesian Fusion};
+
+\node[supported, below right=0.3cm and 0cm of fusion] (high) {$C \geq 0.75$\\Verified};
+\node[unverifiable, below=0.3cm of high] (med) {$0.40 \leq C < 0.75$\\Uncertain};
+\node[contradicted, below=0.3cm of med] (low) {$C < 0.50$\\Hallucination};
+
+% Arrows
+\draw[myarrow] (s1.east) -- (fusion);
+\draw[myarrow] (s2.east) -- (fusion);
+\draw[myarrow] (s3.east) -- (fusion);
+\draw[myarrow] (s4.east) -- (fusion);
+\draw[myarrow] (s5.east) -- (fusion);
+\draw[myarrow] (fusion) -- (high);
+\draw[myarrow] (high) -- (med);
+\draw[myarrow] (med) -- (low);
+
+\end{tikzpicture}
+}
+
+% ════════════════════════════════════════════════════════
+% DIAGRAM 7: SelfCheck Two-Path
+% ════════════════════════════════════════════════════════
+\newcommand{\DiagramSelfCheck}{%
+\begin{tikzpicture}[node distance=0.5cm, font=\small]
+
+\node[draw, rounded corners, fill=gray!10] (input) {Claim + Evidence};
+\node[decision, below=0.5cm of input] (check) {LLM\\available?};
+
+\node[pipebox, below left=0.8cm and 0.5cm of check, minimum width=3.5cm, fill=purple!8] (llm) {LLM Sampling Path\\5 calls at temps:\\0.10, 0.25, 0.40, 0.55, 0.70\\Labels: sup / con / unc};
+
+\node[pipebox, below right=0.8cm and 0.5cm of check, minimum width=3.5cm, fill=blue!8] (nli) {NLI Fallback Path\\Run NLI on each evidence\\Map: max(ent) $\rightarrow$ sup\\max(con) $\rightarrow$ con};
+
+\node[pipebox, below=3cm of check, minimum width=5cm] (metrics) {Uncertainty Metrics\\$H_{\text{norm}}$ (entropy) + $D$ (disagreement)\\$U = 0.65 \cdot H + 0.35 \cdot D$};
+
+\node[draw, rounded corners, fill=green!8, below=0.5cm of metrics, minimum width=5cm] (blend) {Confidence Blend\\$\text{new} = 0.80 \times \text{NLI\_conf} + 0.20 \times \text{consistency}$};
+
+\draw[myarrow] (input) -- (check);
+\draw[myarrow] (check) -- node[lbl, left] {yes} (llm);
+\draw[myarrow] (check) -- node[lbl, right] {no} (nli);
+\draw[myarrow] (llm) -- (metrics);
+\draw[myarrow] (nli) -- (metrics);
+\draw[myarrow] (metrics) -- (blend);
+
+\end{tikzpicture}
+}
+
+% ════════════════════════════════════════════════════════
+% DIAGRAM 8: Deployment Architecture
+% ════════════════════════════════════════════════════════
+\newcommand{\DiagramDeployment}{%
+\begin{tikzpicture}[node distance=0.5cm and 0.8cm, font=\small]
+
+\node[clientbox, minimum width=3.5cm] (user) {Chrome Browser\\+ Extension};
+
+\node[pipebox, below left=1.5cm and 0cm of user, minimum width=3.5cm] (hf) {HuggingFace Spaces\\Docker: python:3.11-slim\\Pre-built FAISS (25\,MB)\\Pre-downloaded models\\Port 7860};
+
+\node[pipebox, below right=1.5cm and 0cm of user, minimum width=3cm] (vercel) {Vercel\\Next.js 15.5.15\\Static export};
+
+\node[extbox, below=1.2cm of hf] (groq) {Groq API (free)\\Llama 3.1 70B\\30 req/min};
+\node[extbox, right=0.5cm of groq] (wikiapi) {Wikipedia API\\6.8M articles\\Unlimited};
+
+% Arrows
+\draw[myarrow] (user) -- node[lbl, left] {HTTPS} (hf);
+\draw[myarrow] (user) -- node[lbl, right] {HTTPS} (vercel);
+\draw[dasharrow] (hf) -- node[lbl, left] {HTTPS} (groq);
+\draw[dasharrow] (hf) -- node[lbl, right] {HTTPS} (wikiapi);
+
+% Cost labels
+\node[font=\scriptsize\itshape, below=0.1cm of groq] {\$0/month};
+\node[font=\scriptsize\itshape, below=0.1cm of wikiapi] {\$0/month};
+\node[font=\scriptsize\itshape, below right=0.1cm and -0.5cm of hf] {\$0/month};
+\node[font=\scriptsize\itshape, below left=0.1cm and -0.5cm of vercel] {\$0/month};
+
+\end{tikzpicture}
+}
+
+% ════════════════════════════════════════════════════════
+% DIAGRAM 9: Rule Engine (9 categories)
+% ════════════════════════════════════════════════════════
+\newcommand{\DiagramRules}{%
+\begin{tikzpicture}[node distance=0.35cm, font=\small]
+
+\node[draw, rounded corners, fill=gray!10, minimum width=4cm] (input) {claim\_text.lower()};
+
+\node[decision, below=0.4cm of input, minimum width=1cm] (r1) {Landmark?\\(38)};
+\node[decision, below=0.4cm of r1] (r2) {Capital?\\(34)};
+\node[decision, below=0.4cm of r2] (r3) {City?\\(43)};
+\node[decision, below=0.4cm of r3] (r4) {Country?\\(32)};
+\node[decision, below=0.4cm of r4] (r5) {Person?\\(29)};
+\node[decision, below=0.4cm of r5] (r6) {Event?\\(7)};
+\node[decision, below=0.4cm of r6] (r7) {Dates?\\(9)};
+\node[decision, below=0.4cm of r7] (r8) {Science\#?\\(5)};
+\node[decision, below=0.4cm of r8] (r9) {Science T/F?\\(8)};
+
+\node[contradicted, right=2.5cm of r5] (hit) {CONTRADICTED\\conf: 0.95\\Skip NLI};
+
+\node[supported, below=0.4cm of r9] (miss) {No match\\$\rightarrow$ NLI};
+
+\draw[myarrow] (input) -- (r1);
+\draw[myarrow] (r1) -- (r2);
+\draw[myarrow] (r2) -- (r3);
+\draw[myarrow] (r3) -- (r4);
+\draw[myarrow] (r4) -- (r5);
+\draw[myarrow] (r5) -- (r6);
+\draw[myarrow] (r6) -- (r7);
+\draw[myarrow] (r7) -- (r8);
+\draw[myarrow] (r8) -- (r9);
+\draw[myarrow] (r9) -- (miss);
+
+% Match arrows
+\foreach \n in {r1,r2,r3,r4,r5,r6,r7,r8,r9} {
+    \draw[myarrow, red!70!black] (\n.east) -- (hit);
+}
+
+\end{tikzpicture}
+}
+
+% ════════════════════════════════════════════════════════
+% DIAGRAM 10: LLM Fallback Chain
+% ════════════════════════════════════════════════════════
+\newcommand{\DiagramFallback}{%
+\begin{tikzpicture}[node distance=0.6cm, font=\small]
+
+\node[draw, rounded corners, fill=gray!10, minimum width=3.5cm] (req) {LLM.generate()\\(decomposition /\\optimization / corrections)};
+
+\node[decision, below=0.5cm of req] (prov) {provider?};
+
+\node[pipebox, below left=0.7cm and 1cm of prov, fill=green!10] (ollama) {Ollama\\llama3.1:8b\\localhost:11434};
+\node[pipebox, below=0.5cm of prov, fill=green!10] (groq) {Groq API\\llama-3.1-70b\\Free, 500 tok/s};
+\node[pipebox, below right=0.7cm and 1cm of prov] (none) {provider=``none''};
+
+\node[pipebox, below=0.5cm of ollama] (anthro) {Anthropic\\Claude Sonnet\\(if API key)};
+\node[pipebox, below=0.5cm of anthro] (openai) {OpenAI\\GPT-4o-mini\\(if API key)};
+\node[draw, rounded corners, fill=red!10, below=0.5cm of openai] (spacy) {spaCy fallback\\en\_core\_web\_sm};
+
+\node[draw, rounded corners, fill=green!15, right=1.5cm of groq] (success) {Return\\response text};
+\node[draw, rounded corners, fill=red!10, below=0.5cm of spacy] (fail) {Return None\\$\rightarrow$ spaCy};
+
+% Arrows
+\draw[myarrow] (req) -- (prov);
+\draw[myarrow] (prov) -- node[lbl, left] {ollama} (ollama);
+\draw[myarrow] (prov) -- node[lbl, right] {groq} (groq);
+\draw[myarrow] (prov) -- node[lbl, right] {none} (none);
+\draw[myarrow] (none) -- (spacy);
+
+\draw[myarrow, green!60!black] (ollama) -- node[lbl, right] {ok} (success);
+\draw[myarrow, green!60!black] (groq) -- node[lbl, above] {ok} (success);
+\draw[myarrow, red!60!black] (ollama) -- node[lbl, left] {fail} (anthro);
+\draw[myarrow, green!60!black] (anthro.east) -| (success);
+\draw[myarrow, red!60!black] (anthro) -- node[lbl, left] {fail} (openai);
+\draw[myarrow, green!60!black] (openai.east) -| (success);
+\draw[myarrow, red!60!black] (openai) -- node[lbl, left] {fail} (spacy);
+
+\end{tikzpicture}
+}
+
+% ════════════════════════════════════════════════════════
+% DIAGRAM BONUS: Sequence Diagram (simplified)
+% ════════════════════════════════════════════════════════
+\newcommand{\DiagramSequence}{%
+\begin{tikzpicture}[font=\small, node distance=0.3cm]
+
+% Participants
+\node (u) {User/Ext};
+\node[right=1.5cm of u] (api) {API};
+\node[right=1.2cm of api] (dec) {Decomposer};
+\node[right=1.2cm of dec] (rules) {Rules};
+\node[right=1.2cm of rules] (ret) {Retriever};
+\node[right=1.2cm of ret] (nli) {NLI};
+
+% Lifelines
+\foreach \n in {u,api,dec,rules,ret,nli} {
+    \draw[dotted] (\n.south) -- ++(0,-7);
+}
+
+% Messages
+\draw[myarrow] ($(u.south)+(0,-0.5)$) -- node[lbl, above] {POST /analyze/fast} ($(api.south)+(0,-0.5)$);
+\draw[myarrow] ($(api.south)+(0,-1)$) -- node[lbl, above] {decompose()} ($(dec.south)+(0,-1)$);
+\draw[myarrow] ($(dec.south)+(0,-1.5)$) -- node[lbl, above] {claims[]} ($(api.south)+(0,-1.5)$);
+\draw[myarrow] ($(api.south)+(0,-2)$) -- node[lbl, above] {check\_rules()} ($(rules.south)+(0,-2)$);
+\draw[myarrow] ($(rules.south)+(0,-2.5)$) -- node[lbl, above, text=red] {ruled[]} ($(api.south)+(0,-2.5)$);
+\draw[myarrow] ($(api.south)+(0,-3)$) -- node[lbl, above] {batch\_retrieve()} ($(ret.south)+(0,-3)$);
+\draw[myarrow] ($(ret.south)+(0,-3.5)$) -- node[lbl, above] {evidence[][]} ($(api.south)+(0,-3.5)$);
+\draw[myarrow] ($(api.south)+(0,-4)$) -- node[lbl, above] {batch\_judge()} ($(nli.south)+(0,-4)$);
+\draw[myarrow] ($(nli.south)+(0,-4.5)$) -- node[lbl, above] {verdicts[]} ($(api.south)+(0,-4.5)$);
+\draw[myarrow] ($(api.south)+(0,-5.5)$) -- node[lbl, above] {JSON response} ($(u.south)+(0,-5.5)$);
+
+% Annotations
+\node[font=\scriptsize, text=gray, right=0.1cm of nli, anchor=west] at ($(nli.south)+(0.1,-4.2)$) {single DeBERTa\\forward pass};
+
+\end{tikzpicture}
+}
