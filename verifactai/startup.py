@@ -42,29 +42,14 @@ def main() -> None:
             load_wikipedia,
         )
 
-        # Build multi-source knowledge base
+        # Build knowledge base — lean for free CPU (must finish in <25 min)
         chunks = load_wikipedia(max_articles)
 
-        # SQuAD: high-quality Wikipedia reading comprehension passages
-        try:
-            chunks.extend(load_squad())
-        except Exception as e:
-            print(f"  SQuAD failed: {e}, continuing...")
-
-        # PubMed: medical/scientific knowledge
-        try:
-            chunks.extend(load_pubmed())
-        except Exception as e:
-            print(f"  PubMed failed: {e}, continuing...")
-
-        # FEVER: fact verification claims with labels
+        # FEVER: labeled fact claims — small, fast, high value for accuracy
         try:
             chunks.extend(load_fever())
         except Exception as e:
             print(f"  FEVER failed: {e}, continuing...")
-
-        # Skip Natural Questions on HF free tier (too slow)
-        os.environ["VERIFACT_SKIP_NQ"] = "1"
 
         build_and_save(chunks, cfg.retrieval.index_path, cfg.retrieval.metadata_path)
         print(f"Index ready: {index_path}")
