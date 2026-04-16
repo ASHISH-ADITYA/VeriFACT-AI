@@ -13,11 +13,12 @@
  *   - Dashboard aggregates all results across full conversation
  */
 
-const PLATFORM = location.hostname.includes("claude")
-  ? "claude"
-  : location.hostname.includes("gemini")
-    ? "gemini"
-    : "chatgpt";
+const PLATFORM = location.hostname.includes("claude") ? "claude"
+  : location.hostname.includes("gemini") ? "gemini"
+  : location.hostname.includes("grok") || (location.hostname.includes("x.com") && location.pathname.includes("grok")) ? "grok"
+  : location.hostname.includes("copilot") ? "copilot"
+  : location.hostname.includes("perplexity") ? "perplexity"
+  : "chatgpt";
 
 const DEBOUNCE_MS = 1500;
 const POLL_FALLBACK_MS = 8000;
@@ -115,14 +116,29 @@ function getAssistantNodes() {
   if (PLATFORM === "chatgpt") {
     nodes = document.querySelectorAll("[data-message-author-role='assistant']");
   } else if (PLATFORM === "gemini") {
-    // Gemini 2025/2026 DOM selectors (multiple fallbacks)
     nodes = document.querySelectorAll(
       "message-content .markdown, model-response .markdown, model-response, " +
       ".response-container .markdown, div[data-message-id] .markdown, " +
       ".conversation-container .model-response-text, .response-content"
     );
+  } else if (PLATFORM === "grok") {
+    nodes = document.querySelectorAll(
+      "div[class*='message'][class*='bot'], div[class*='assistant'], " +
+      "div[class*='response'], div[data-testid*='message'] div[class*='markdown'], " +
+      "article div[class*='prose'], div[class*='grok-response']"
+    );
+  } else if (PLATFORM === "copilot") {
+    nodes = document.querySelectorAll(
+      "div[class*='response'], div[class*='answer'], cib-message-group[source='bot'] .content, " +
+      "div[data-content][class*='message'], div[class*='ac-container']"
+    );
+  } else if (PLATFORM === "perplexity") {
+    nodes = document.querySelectorAll(
+      "div[class*='prose'], div[class*='answer'], div[class*='response-text'], " +
+      "div[data-testid*='answer'], div[class*='markdown-content']"
+    );
   } else {
-    // Claude
+    // Claude + fallback
     nodes = document.querySelectorAll(
       "div[data-is-streaming], div.prose, div.font-claude-message, " +
       "div[class*='claude'], div[class*='response']"
