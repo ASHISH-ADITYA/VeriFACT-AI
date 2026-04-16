@@ -1,6 +1,5 @@
-/* VeriFACT AI — Liquid Glass Dashboard
-   Inspired by Apple Liquid Glass UI design language.
-   Transparent, prismatic, depth-rich glassmorphism.
+/* VeriFACT AI — Crystal Clear Liquid Glass Dashboard
+   Sharp, visible, thick glass borders, bright elements.
 */
 
 /* ── Beacon ──────────────────────────────────────────── */
@@ -12,468 +11,273 @@
   width: 54px;
   height: 54px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.7);
   box-shadow:
-    0 6px 24px rgba(0, 0, 0, 0.12),
-    0 1px 3px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    0 8px 28px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.1),
+    inset 0 2px 0 rgba(255, 255, 255, 0.6);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 2147483646;
   cursor: pointer;
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
   font-size: 11px;
   font-weight: 700;
   color: #fff;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   -webkit-user-select: none;
   user-select: none;
 }
-
-.verifact-beacon:hover {
-  transform: scale(1.08);
-  box-shadow: 0 10px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.9);
-}
+.verifact-beacon:hover { transform: scale(1.08); }
 .verifact-beacon:active { transform: scale(0.95); }
 
 .verifact-beacon-label { font-size: 15px; font-weight: 800; line-height: 1; }
-.verifact-beacon-status {
-  font-size: 7px; font-weight: 600; opacity: 0.85;
-  text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2px;
-}
+.verifact-beacon-status { font-size: 7px; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2px; }
 
-/* ── Beacon States ───────────────────────────────────── */
+.verifact-beacon.idle       { background: linear-gradient(145deg, #5b9cf5, #3b7ddb); }
+.verifact-beacon.analyzing  { background: linear-gradient(145deg, #a78bfa, #7c3aed); animation: vfPulse 1.5s infinite; }
+.verifact-beacon.safe       { background: linear-gradient(145deg, #4ade80, #22c55e); }
+.verifact-beacon.minor      { background: linear-gradient(145deg, #c084fc, #9333ea); }
+.verifact-beacon.moderate   { background: linear-gradient(145deg, #fb923c, #ea580c); }
+.verifact-beacon.hallucinated { background: linear-gradient(145deg, #f87171, #dc2626); animation: vfPulseRed 1s infinite; }
+.verifact-beacon.error      { background: linear-gradient(145deg, #9ca3af, #6b7280); }
 
-.verifact-beacon.idle       { background: linear-gradient(145deg, rgba(100,160,240,0.7), rgba(60,120,220,0.85)); }
-.verifact-beacon.analyzing  { background: linear-gradient(145deg, rgba(160,120,240,0.7), rgba(120,60,220,0.85)); animation: vfPulse 1.5s infinite; }
-.verifact-beacon.safe       { background: linear-gradient(145deg, rgba(80,200,140,0.7), rgba(40,170,100,0.85)); }
-.verifact-beacon.minor      { background: linear-gradient(145deg, rgba(160,120,240,0.7), rgba(130,60,210,0.85)); }
-.verifact-beacon.moderate   { background: linear-gradient(145deg, rgba(240,170,80,0.7), rgba(220,130,40,0.85)); }
-.verifact-beacon.hallucinated { background: linear-gradient(145deg, rgba(240,100,100,0.7), rgba(200,50,50,0.85)); animation: vfPulseRed 1s infinite; }
-.verifact-beacon.error      { background: linear-gradient(145deg, rgba(150,150,160,0.6), rgba(120,120,130,0.8)); }
+@keyframes vfPulse { 0%{box-shadow:0 0 0 0 rgba(124,58,237,0.4)} 70%{box-shadow:0 0 0 12px rgba(124,58,237,0)} 100%{box-shadow:0 0 0 0 rgba(124,58,237,0)} }
+@keyframes vfPulseRed { 0%{box-shadow:0 0 0 0 rgba(220,38,38,0.4)} 70%{box-shadow:0 0 0 12px rgba(220,38,38,0)} 100%{box-shadow:0 0 0 0 rgba(220,38,38,0)} }
 
-@keyframes vfPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(140,100,240,0.4); }
-  70%  { box-shadow: 0 0 0 12px rgba(140,100,240,0); }
-  100% { box-shadow: 0 0 0 0 rgba(140,100,240,0); }
-}
-@keyframes vfPulseRed {
-  0%   { box-shadow: 0 0 0 0 rgba(240,80,80,0.4); }
-  70%  { box-shadow: 0 0 0 12px rgba(240,80,80,0); }
-  100% { box-shadow: 0 0 0 0 rgba(240,80,80,0); }
-}
-
-/* Glow ring */
 .verifact-beacon::before {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: 18px;
-  background: conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.2) 25%, transparent 50%, rgba(255,255,255,0.15) 75%, transparent 100%);
-  animation: vfGlow 3s linear infinite;
-  pointer-events: none;
+  content: ''; position: absolute; inset: -3px; border-radius: 18px;
+  background: conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.25) 25%, transparent 50%, rgba(255,255,255,0.2) 75%, transparent 100%);
+  animation: vfGlow 3s linear infinite; pointer-events: none;
 }
-@keyframes vfGlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes vfGlow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
 
-/* ── Dashboard (Liquid Glass) ────────────────────────── */
+/* ── Dashboard ───────────────────────────────────────── */
 
 .vf-dashboard {
   position: fixed;
-  width: 390px;
+  width: 380px;
   max-height: 78vh;
   z-index: 2147483646;
   opacity: 0;
-  transform: translateY(16px) scale(0.96);
+  transform: translateY(14px) scale(0.96);
   transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   pointer-events: none;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
 }
+.vf-dashboard.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
 
-.vf-dashboard.show {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  pointer-events: auto;
-}
-
+/* ── Main glass panel — thick border, crystal clear ── */
 .vf-dash-inner {
   position: relative;
-  border-radius: 22px;
+  border-radius: 20px;
   overflow: hidden;
   max-height: 78vh;
   overflow-y: auto;
-  padding: 22px 18px 14px;
+  padding: 20px 16px 14px;
 
-  /* Liquid glass — dark translucent like reference image */
-  background: linear-gradient(
-    165deg,
-    rgba(60, 55, 75, 0.55) 0%,
-    rgba(50, 50, 70, 0.5) 30%,
-    rgba(55, 50, 65, 0.48) 60%,
-    rgba(45, 55, 65, 0.52) 100%
-  );
-  border: 0.5px solid rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(80px) saturate(200%);
-  -webkit-backdrop-filter: blur(80px) saturate(200%);
+  /* Crystal clear glass — light, bright, sharp */
+  background: rgba(245, 245, 250, 0.82);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(50px) saturate(180%);
+  -webkit-backdrop-filter: blur(50px) saturate(180%);
   box-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.3),
-    0 4px 16px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -0.5px 0 rgba(0, 0, 0, 0.2);
-  color: #e8e8f0;
+    0 20px 60px rgba(0, 0, 0, 0.15),
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    inset 0 2px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+  color: #1a1a2e;
 }
 
-/* Prismatic rainbow sheen on top edge */
+/* Rainbow prismatic top edge */
 .vf-dash-inner::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1.5px;
+  content: ''; position: absolute;
+  top: 0; left: 10%; right: 10%; height: 2px; z-index: 1;
   background: linear-gradient(90deg,
-    transparent 3%,
-    rgba(180,140,255,0.5) 15%,
-    rgba(100,230,220,0.5) 35%,
-    rgba(255,180,200,0.4) 55%,
-    rgba(140,200,255,0.5) 75%,
-    rgba(200,160,255,0.4) 90%,
-    transparent 97%
+    rgba(100,140,255,0.6),
+    rgba(180,120,255,0.6),
+    rgba(100,220,200,0.6),
+    rgba(255,160,180,0.5),
+    rgba(100,180,255,0.6)
   );
-  z-index: 1;
+  border-radius: 2px;
 }
 
-/* Scrollbar */
 .vf-dash-inner::-webkit-scrollbar { width: 4px; }
 .vf-dash-inner::-webkit-scrollbar-track { background: transparent; }
-.vf-dash-inner::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 4px; }
+.vf-dash-inner::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 4px; }
 
-/* ── Close button ────────────────────────────────────── */
-
+/* ── Close ───────────────────────────────────────────── */
 .vf-close {
-  position: absolute;
-  top: 10px; right: 12px;
-  width: 26px; height: 26px;
-  border-radius: 50%;
-  border: 0.5px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.5);
-  font-size: 16px;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s ease;
-  padding: 0; line-height: 1;
+  position: absolute; top: 8px; right: 10px;
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 1.5px solid rgba(0,0,0,0.1);
+  background: rgba(255,255,255,0.8);
+  color: rgba(0,0,0,0.4); font-size: 15px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; padding: 0; line-height: 1;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-.vf-close:hover { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); }
+.vf-close:hover { background: #fff; color: rgba(0,0,0,0.7); }
 
 /* ── Header ──────────────────────────────────────────── */
-
-.vf-dash-header { text-align: center; margin-bottom: 16px; }
+.vf-dash-header { text-align: center; margin-bottom: 14px; }
 
 .vf-logo {
-  display: inline-flex;
-  width: 38px; height: 38px;
-  border-radius: 12px;
-  /* Liquid glass button — purple tint like reference */
-  background: linear-gradient(145deg, rgba(120,90,220,0.6), rgba(90,60,200,0.75));
-  border: 0.5px solid rgba(255,255,255,0.5);
-  box-shadow:
-    0 4px 14px rgba(100,70,200,0.25),
-    inset 0 1px 0 rgba(255,255,255,0.5),
-    inset 0 -1px 0 rgba(0,0,0,0.1);
+  display: inline-flex; width: 38px; height: 38px; border-radius: 11px;
+  /* Bright purple glass button like reference */
+  background: linear-gradient(145deg, #9b7bf7, #7c5ce0);
+  border: 2px solid rgba(255,255,255,0.5);
+  box-shadow: 0 4px 14px rgba(124,92,224,0.35), inset 0 2px 0 rgba(255,255,255,0.4);
   align-items: center; justify-content: center;
-  font-size: 14px; font-weight: 800;
-  color: #fff;
-  text-decoration: none;
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  font-size: 14px; font-weight: 800; color: #fff;
+  text-decoration: none; cursor: pointer;
+  margin-bottom: 6px;
+  transition: all 0.2s;
 }
-.vf-logo:hover {
-  transform: scale(1.08);
-  box-shadow: 0 6px 20px rgba(100,70,200,0.35), inset 0 1px 0 rgba(255,255,255,0.6);
-}
+.vf-logo:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(124,92,224,0.45); }
 
-.vf-title {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: #f0f0f5;
-}
+.vf-title { font-size: 16px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.02em; }
+.vf-subtitle { font-size: 10px; color: rgba(0,0,0,0.4); margin-top: 1px; }
 
-.vf-subtitle {
-  font-size: 11px;
-  color: rgba(255,255,255,0.35);
-  letter-spacing: 0.02em;
-  margin-top: 2px;
-}
-
-/* ── KPI Row (glass pills) ───────────────────────────── */
-
-.vf-kpi-row {
-  display: flex;
-  gap: 5px;
-  margin-bottom: 14px;
-}
+/* ── KPI Row — thick glass pills ─────────────────────── */
+.vf-kpi-row { display: flex; gap: 5px; margin-bottom: 12px; }
 
 .vf-kpi {
-  flex: 1;
-  text-align: center;
-  padding: 10px 4px;
+  flex: 1; text-align: center; padding: 8px 2px;
   border-radius: 14px;
-  /* Glass pill — dark frosted */
-  background: rgba(255, 255, 255, 0.07);
-  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  /* Thick glass pill like reference cards */
+  background: rgba(255, 255, 255, 0.75);
+  border: 2px solid rgba(255, 255, 255, 0.9);
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 3px 10px rgba(0, 0, 0, 0.06),
+    inset 0 2px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.03);
 }
 
-.vf-kpi-val {
-  font-size: 19px;
-  font-weight: 800;
-  line-height: 1.1;
-  color: #f0f0f5;
-}
+.vf-kpi-val { font-size: 18px; font-weight: 800; line-height: 1.1; color: #1a1a2e; }
+.vf-kpi-lbl { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(0,0,0,0.4); margin-top: 1px; }
 
-.vf-kpi-lbl {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(255,255,255,0.4);
-  margin-top: 2px;
-}
-
-.vf-green { color: #059669 !important; }
+.vf-green { color: #16a34a !important; }
 .vf-yellow { color: #d97706 !important; }
 .vf-red { color: #dc2626 !important; }
 
-/* ── Divider (prismatic line) ────────────────────────── */
-
+/* ── Divider ─────────────────────────────────────────── */
 .vf-divider {
-  height: 1px;
-  background: linear-gradient(90deg,
-    transparent,
-    rgba(160,130,255,0.2) 20%,
-    rgba(100,200,220,0.2) 50%,
-    rgba(255,160,180,0.15) 80%,
-    transparent
-  );
-  margin: 4px 0 12px;
+  height: 1.5px; margin: 2px 0 10px;
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,0.06) 20%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.06) 80%, transparent);
 }
 
 /* ── Section title ───────────────────────────────────── */
+.vf-section-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(0,0,0,0.45); margin-bottom: 8px; }
 
-.vf-section-title {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: rgba(255,255,255,0.4);
-  margin-bottom: 10px;
-}
-
-/* ── Claim Cards (liquid glass cards) ────────────────── */
-
-.vf-cards { display: flex; flex-direction: column; gap: 7px; }
+/* ── Cards — thick glass with colored accents ────────── */
+.vf-cards { display: flex; flex-direction: column; gap: 6px; }
 
 .vf-card {
-  border-radius: 16px;
-  padding: 13px;
-  /* Dark frosted glass card */
-  background: rgba(255, 255, 255, 0.06);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px; padding: 12px;
+  /* Crystal clear card — white glass */
+  background: rgba(255, 255, 255, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.85);
   box-shadow:
-    0 3px 12px rgba(0, 0, 0, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  transition: all 0.2s ease;
+    0 3px 12px rgba(0, 0, 0, 0.05),
+    inset 0 2px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.02);
+  transition: all 0.15s;
 }
+.vf-card:hover { background: rgba(255,255,255,0.85); box-shadow: 0 5px 18px rgba(0,0,0,0.08); }
 
-.vf-card:hover {
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 5px 18px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.1);
-}
-
-/* Colored left accent — glass tinted glow */
+/* Colored glass accent — like the blue/orange buttons in reference */
 .vf-card-red {
-  border-left: 3px solid rgba(240, 80, 80, 0.6);
-  background: linear-gradient(135deg, rgba(240,80,80,0.08), rgba(255,255,255,0.04));
+  border-left: 4px solid #ef4444;
+  background: linear-gradient(135deg, rgba(254,226,226,0.6), rgba(255,255,255,0.7));
 }
 .vf-card-yellow {
-  border-left: 3px solid rgba(240, 180, 40, 0.6);
-  background: linear-gradient(135deg, rgba(240,180,40,0.06), rgba(255,255,255,0.04));
+  border-left: 4px solid #f59e0b;
+  background: linear-gradient(135deg, rgba(254,243,199,0.5), rgba(255,255,255,0.7));
 }
 .vf-card-green {
-  border-left: 3px solid rgba(50, 200, 120, 0.6);
-  background: linear-gradient(135deg, rgba(50,200,120,0.06), rgba(255,255,255,0.04));
+  border-left: 4px solid #22c55e;
+  background: linear-gradient(135deg, rgba(220,252,231,0.5), rgba(255,255,255,0.7));
 }
 
-.vf-card-header {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 7px;
-}
+.vf-card-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 
+/* Icons — bright colored glass pills */
 .vf-icon {
-  display: inline-flex;
-  width: 22px; height: 22px;
-  border-radius: 7px;
+  display: inline-flex; width: 22px; height: 22px; border-radius: 7px;
   align-items: center; justify-content: center;
   font-size: 11px; font-weight: 800;
-  border: 0.5px solid rgba(255,255,255,0.12);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  border: 1.5px solid rgba(255,255,255,0.7);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.5);
 }
+.vf-icon-red    { background: linear-gradient(145deg, #fca5a5, #ef4444); color: #fff; }
+.vf-icon-green  { background: linear-gradient(145deg, #86efac, #22c55e); color: #fff; }
+.vf-icon-yellow { background: linear-gradient(145deg, #fde68a, #f59e0b); color: #fff; }
+.vf-icon-gray   { background: linear-gradient(145deg, #d1d5db, #9ca3af); color: #fff; }
 
-.vf-icon-red    { background: rgba(240,80,80,0.25); color: #f87171; }
-.vf-icon-green  { background: rgba(52,211,153,0.25); color: #34d399; }
-.vf-icon-yellow { background: rgba(251,191,36,0.25); color: #fbbf24; }
-.vf-icon-gray   { background: rgba(156,163,175,0.15); color: #9ca3af; }
+.vf-card-verdict { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #1a1a2e; }
+.vf-card-conf { margin-left: auto; font-size: 12px; font-weight: 800; color: rgba(0,0,0,0.5); }
 
-.vf-card-verdict {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: rgba(255,255,255,0.85);
-}
+.vf-card-claim { font-size: 12.5px; line-height: 1.45; color: #1a1a2e; margin-bottom: 6px; }
 
-.vf-card-conf {
-  margin-left: auto;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255,255,255,0.45);
-}
-
-.vf-card-claim {
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: rgba(255,255,255,0.8);
-  margin-bottom: 7px;
-}
-
+/* Evidence inset — recessed glass field like text inputs in reference */
 .vf-card-evidence {
-  font-size: 10.5px;
-  line-height: 1.4;
-  color: rgba(255,255,255,0.45);
-  padding: 7px 9px;
-  border-radius: 10px;
-  /* Inner glass inset */
-  background: rgba(255,255,255,0.04);
-  border: 0.5px solid rgba(255,255,255,0.08);
-  margin-bottom: 5px;
+  font-size: 10.5px; line-height: 1.4; color: rgba(0,0,0,0.5);
+  padding: 7px 9px; border-radius: 10px;
+  background: rgba(255,255,255,0.6);
+  border: 1.5px solid rgba(0,0,0,0.06);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.04);
+  margin-bottom: 4px;
 }
-
-.vf-card-ev-label {
-  font-weight: 600;
-  color: rgba(255,255,255,0.6);
-}
-
-.vf-card-source {
-  font-size: 10px;
-  color: rgba(255,255,255,0.25);
-  font-style: italic;
-}
+.vf-card-ev-label { font-weight: 700; color: rgba(0,0,0,0.6); }
+.vf-card-source { font-size: 10px; color: rgba(0,0,0,0.3); font-style: italic; }
 
 /* ── Empty state ─────────────────────────────────────── */
-
 .vf-empty {
-  text-align: center;
-  padding: 22px 14px;
-  font-size: 12.5px;
-  color: rgba(255,255,255,0.4);
-  border-radius: 14px;
-  background: rgba(50,200,120,0.06);
-  border: 0.5px solid rgba(50,200,120,0.1);
+  text-align: center; padding: 20px 14px; font-size: 12.5px;
+  color: rgba(0,0,0,0.4); border-radius: 14px;
+  background: rgba(220,252,231,0.4);
+  border: 1.5px solid rgba(34,197,94,0.2);
 }
 
 /* ── Footer ──────────────────────────────────────────── */
+.vf-footer { text-align: center; font-size: 9px; color: rgba(0,0,0,0.25); margin-top: 8px; }
 
-.vf-footer {
-  text-align: center;
-  font-size: 9px;
-  color: rgba(255,255,255,0.2);
-  margin-top: 10px;
-  letter-spacing: 0.02em;
-}
-
-/* ── Inline highlights (in chatbot text) ─────────────── */
-
+/* ── Inline highlights ───────────────────────────────── */
 .verifact-hl-red {
-  background: rgba(239, 68, 68, 0.2);
-  border-radius: 4px;
-  padding: 2px 4px;
-  cursor: help;
-  transition: background 0.15s ease;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
+  background: rgba(239, 68, 68, 0.2); border-radius: 4px; padding: 2px 4px;
+  cursor: help; transition: background 0.15s; box-decoration-break: clone; -webkit-box-decoration-break: clone;
 }
 .verifact-hl-red:hover { background: rgba(239, 68, 68, 0.35); }
 
 .verifact-hl-yellow {
-  background: rgba(245, 158, 11, 0.18);
-  border-radius: 4px;
-  padding: 2px 4px;
-  cursor: help;
-  transition: background 0.15s ease;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
+  background: rgba(245, 158, 11, 0.18); border-radius: 4px; padding: 2px 4px;
+  cursor: help; transition: background 0.15s; box-decoration-break: clone; -webkit-box-decoration-break: clone;
 }
 .verifact-hl-yellow:hover { background: rgba(245, 158, 11, 0.32); }
 
-/* ── Prompt Suggestion Tooltip ───────────────────────── */
-
+/* ── Prompt Tip ──────────────────────────────────────── */
 .vf-prompt-tip {
-  position: fixed;
-  left: 50%;
-  bottom: 80px;
-  width: 420px;
-  max-width: 90vw;
-  z-index: 2147483645;
-  border-radius: 18px;
-  padding: 14px 16px;
-  background: linear-gradient(165deg, rgba(255,255,255,0.45), rgba(245,240,255,0.35));
-  border: 0.5px solid rgba(255,255,255,0.55);
-  backdrop-filter: blur(50px) saturate(200%) brightness(1.05);
-  -webkit-backdrop-filter: blur(50px) saturate(200%) brightness(1.05);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.6);
-  color: #1a1a2e;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
-  font-size: 12px;
-  opacity: 0;
-  transform: translateY(8px);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  pointer-events: none;
+  position: fixed; left: 50%; bottom: 80px; width: 420px; max-width: 90vw;
+  z-index: 2147483645; border-radius: 16px; padding: 12px 14px;
+  background: rgba(245,245,250,0.88); border: 2px solid rgba(255,255,255,0.8);
+  backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12), inset 0 2px 0 rgba(255,255,255,0.8);
+  color: #1a1a2e; font-family: -apple-system, sans-serif; font-size: 12px;
+  opacity: 0; transform: translateY(8px); transition: all 0.25s; pointer-events: none;
 }
 .vf-prompt-tip.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
-.vf-pt-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.vf-pt-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.vf-pt-logo { width: 20px; height: 20px; border-radius: 6px; background: linear-gradient(145deg,#9b7bf7,#7c5ce0); border: 1.5px solid rgba(255,255,255,0.5); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: #fff; }
+.vf-pt-title { font-size: 12px; font-weight: 700; color: #1a1a2e; }
+.vf-pt-score { margin-left: auto; font-size: 12px; font-weight: 800; color: #7c5ce0; }
 
-.vf-pt-logo {
-  width: 22px; height: 22px; border-radius: 7px;
-  background: linear-gradient(145deg, rgba(120,90,220,0.5), rgba(90,60,200,0.65));
-  border: 0.5px solid rgba(255,255,255,0.5);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 800; color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
-}
-
-.vf-pt-title { font-size: 12px; font-weight: 700; color: rgba(0,0,0,0.7); }
-.vf-pt-score { margin-left: auto; font-size: 12px; font-weight: 700; color: rgba(120,90,220,0.7); }
-
-.vf-pt-item {
-  padding: 6px 10px; margin-bottom: 4px; border-radius: 10px;
-  background: rgba(120,90,220,0.06);
-  border-left: 2px solid rgba(120,90,220,0.3);
-  font-size: 11px; line-height: 1.4; color: rgba(0,0,0,0.6);
-}
-
-.vf-pt-suggested {
-  margin-top: 8px; padding: 8px 10px; border-radius: 10px;
-  background: rgba(50,200,120,0.06);
-  border: 0.5px solid rgba(50,200,120,0.15);
-  font-size: 11px; line-height: 1.4; color: rgba(0,0,0,0.65);
-}
+.vf-pt-item { padding: 5px 9px; margin-bottom: 3px; border-radius: 8px; background: rgba(124,92,224,0.06); border-left: 2px solid rgba(124,92,224,0.3); font-size: 11px; line-height: 1.4; color: rgba(0,0,0,0.6); }
+.vf-pt-suggested { margin-top: 6px; padding: 7px 9px; border-radius: 8px; background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.15); font-size: 11px; line-height: 1.4; color: rgba(0,0,0,0.65); }
