@@ -144,7 +144,8 @@ async function callAPI(text) {
 
 function highlightNode(node, flags) {
   if (!node || !flags || node.dataset.vfDone === "1") return;
-  const bad = flags.filter((f) => /(contrad|unver)/i.test(f.verdict || ""));
+  // Only highlight CONTRADICTED claims — no yellow for UNVERIFIABLE (reduces noise)
+  const bad = flags.filter((f) => /(contrad)/i.test(f.verdict || ""));
   if (!bad.length) { node.dataset.vfDone = "1"; return; }
 
   const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
@@ -158,7 +159,7 @@ function highlightNode(node, flags) {
       const idx = tn.nodeValue.toLowerCase().indexOf(probe);
       if (idx === -1) continue;
       const span = document.createElement("span");
-      span.className = /(contrad)/i.test(f.verdict) ? "verifact-hl-red" : "verifact-hl-yellow";
+      span.className = "verifact-hl-red";
       span.title = `${f.verdict} (${Math.round((f.confidence || 0) * 100)}%)`;
       const full = tn.nodeValue, frag = document.createDocumentFragment();
       if (idx > 0) frag.appendChild(document.createTextNode(full.slice(0, idx)));

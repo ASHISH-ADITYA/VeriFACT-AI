@@ -574,10 +574,39 @@ class EvidenceRetriever:
             with self._faiss_lock:
                 scores_batch, indices_batch = self.index.search(query_batch, k)
 
-        return [
+        results = [
             self._build_evidence(scores_batch[i], indices_batch[i])
             for i in range(len(claims))
         ]
+
+        # Entity verification + Wikipedia API for each claim (critical for fabrication detection)
+        for i, claim_text in enumerate(claims):
+            # Entity verification: does Wikipedia have an article with this exact name?
+            all_verified, unverified = self._verify_claim_entities(claim_text)
+
+            # Wikipedia API search (ALWAYS, for every claim)
+            try:
+                wiki_ev = self._wiki_api_search(claim_text, max_results=2)
+                if wiki_ev:
+                    # Apply title relevance check
+                    for wev in wiki_ev:
+                        relevance = self._check_title_relevance(claim_text, wev.title)
+                        wev.similarity = round(wev.similarity * relevance, 3)
+                    local_titles = {ev.title.lower() for ev in results[i]}
+                    for wev in wiki_ev:
+                        if wev.title.lower() not in local_titles:
+                            results[i].append(wev)
+                    results[i].sort(key=lambda ev: ev.similarity, reverse=True)
+                    results[i] = results[i][:max(k, 5)]
+            except Exception:
+                pass
+
+            # Stamp entity verification flags on all evidence for this claim
+            for ev in results[i]:
+                ev.entity_verified = all_verified
+                ev.unverified_entities = unverified
+
+        return results
 
     # ------------------------------------------------------------------
     # Hybrid fetch: dense FAISS + sparse BM25 with reciprocal rank fusion
