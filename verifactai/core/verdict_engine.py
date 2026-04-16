@@ -317,77 +317,67 @@ class VerdictEngine:
 
         nc = self.config.nli
 
-        # ── CONTRADICTED: only with STRONG + RELEVANT evidence ──
-        # Hard path: very high NLI contradiction + beats entailment + relevant evidence
-        hard_contra = (
-            max_con > nc.contradiction_threshold
-            and max_con > max_raw_ent
-            and best_contra.evidence.similarity > 0.45
-        )
+        # ── Key principle: if Wikipedia has a relevant article, trust it ──
+        import re as _re
 
-        # Soft path: moderate contradiction but evidence must be highly relevant
-        soft_contra = (
-            max_con > 0.65
-            and max_con > max_specific_ent + 0.15  # must beat support by clear margin
+        has_wiki_evidence = any(r.evidence.source == "wikipedia_live" for r in nli_results)
+        best_wiki_sim = max(
+            (r.evidence.similarity for r in nli_results if r.evidence.source == "wikipedia_live"),
+            default=0,
+        )
+        avg_similarity = sum(r.evidence.similarity for r in nli_results) / max(len(nli_results), 1)
+
+        # ── CONTRADICTED: VERY strict — only rule-engine level certainty ──
+        # Hard: NLI contradiction > 0.80 + beats entailment by wide margin + relevant evidence
+        hard_contra = (
+            max_con > 0.80
+            and max_con > max_raw_ent + 0.20
             and best_contra.evidence.similarity > 0.50
         )
 
-        is_contradicted = hard_contra or soft_contra
+        is_contradicted = hard_contra
 
-        # ── SUPPORTED: generous — most facts are correct ──
-        # Strong support: specificity-gated entailment passes threshold
+        # ── SUPPORTED: generous — Wikipedia found it, trust it ──
         strong_support = max_specific_ent > nc.entailment_threshold
+        moderate_support = max_raw_ent > 0.35 and max_similarity > 0.30
+        wiki_confirms = has_wiki_evidence and best_wiki_sim > 0.45
+        weak_support = max_similarity > 0.25 and max_con < 0.60
 
-        # Moderate support: raw entailment is decent with some relevant evidence
-        moderate_support = max_raw_ent > 0.40 and max_similarity > 0.35
-
-        # Weak support: evidence exists and doesn't contradict
-        # This is the key change — when evidence is ambiguous, lean SUPPORTED
-        weak_support = max_similarity > 0.30 and max_con < 0.50
-
-        # ── Fabrication detection ──
-        # Two signals: (1) evidence relevance, (2) Wikipedia API found nothing
-        import re as _re
-
-        avg_similarity = sum(r.evidence.similarity for r in nli_results) / max(len(nli_results), 1)
+        # ── Fabrication: Wikipedia has NOTHING about this specific topic ──
         has_specific_entity = bool(_re.search(r"[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}", claim.text))
         has_technical_term = bool(_re.search(
-            r"theorem|protocol|algorithm|equation|principle|hypothesis|framework|architecture|model|law|effect|syndrome|paradox|stability|vulnerability|mechanism",
+            r"theorem|protocol|algorithm|equation|principle|hypothesis|framework|architecture",
             claim.text.lower(),
         ))
+        evidence_is_irrelevant = max_similarity < 0.35 and avg_similarity < 0.25
 
-        # Check if Wikipedia API returned ANY evidence for this claim
-        has_wiki_evidence = any(r.evidence.source == "wikipedia_live" for r in nli_results)
-        evidence_is_irrelevant = max_similarity < 0.40 and avg_similarity < 0.32
-
-        # Fabrication: specific named concept + no Wikipedia evidence + weak NLI
-        # OR: specific concept + all evidence is irrelevant
+        # Fabrication ONLY if: no Wikipedia evidence AT ALL + specific named concept
         is_likely_fabricated = (
             (has_specific_entity or has_technical_term)
-            and max_raw_ent < 0.50
-            and (not has_wiki_evidence or evidence_is_irrelevant)
+            and not has_wiki_evidence
+            and evidence_is_irrelevant
+            and max_raw_ent < 0.40
         )
 
-        # ── Decision order: FABRICATED → CONTRADICTED → SUPPORTED → UNVERIFIABLE ──
+        # ── Decision: FABRICATED → CONTRADICTED → SUPPORTED → UNVERIFIABLE ──
         if is_likely_fabricated:
             label = "CONTRADICTED"
             best_ev = best_support.evidence
-        elif is_contradicted:
+        elif is_contradicted and not wiki_confirms:
+            # Only contradict if Wikipedia doesn't confirm the claim
             label = "CONTRADICTED"
             best_ev = best_contra.evidence
-        elif strong_support or moderate_support:
+        elif wiki_confirms or strong_support or moderate_support:
+            # Wikipedia found relevant evidence → SUPPORTED
             label = "SUPPORTED"
             best_ev = best_support.evidence
-        elif weak_support and not evidence_is_irrelevant:
-            # Default: evidence exists AND is somewhat relevant → trust the chatbot
+        elif weak_support:
             label = "SUPPORTED"
             best_ev = best_support.evidence
-        elif evidence_is_irrelevant and (has_specific_entity or has_technical_term):
-            # Specific claim but no relevant evidence anywhere → likely fabricated
+        elif evidence_is_irrelevant and not has_wiki_evidence and has_specific_entity:
             label = "CONTRADICTED"
             best_ev = best_support.evidence
         elif evidence_is_irrelevant:
-            # Generic claim with no evidence — genuinely can't verify
             label = "UNVERIFIABLE"
             best_ev = best_support.evidence
         else:
