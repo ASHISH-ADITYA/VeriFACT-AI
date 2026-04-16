@@ -3,23 +3,13 @@ import Head from "next/head";
 
 const API = "https://adiashish-verifact-ai.hf.space";
 
-// SVG icon drawings inspired by each chatbot's visual style
-const CHATBOT_ICONS = {
-  chatgpt: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`,
-  gemini: `<svg viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 14.5 8 18 12C14.5 16 12 22 12 22C12 22 9.5 16 6 12C9.5 8 12 2 12 2Z" fill="currentColor" opacity="0.7"/><path d="M12 6C12 6 13.5 9 16 12C13.5 15 12 18 12 18C12 18 10.5 15 8 12C10.5 9 12 6 12 6Z" fill="currentColor"/></svg>`,
-  claude: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="10" r="6" opacity="0.7"/><path d="M8 14c0 3 1.8 5 4 5s4-2 4-5" opacity="0.5"/><circle cx="10" cy="9" r="1" fill="white"/><circle cx="14" cy="9" r="1" fill="white"/></svg>`,
-  grok: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" opacity="0.7"/></svg>`,
-  copilot: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L3 7v6c0 5 4 9 9 11 5-2 9-6 9-11V7l-9-5z" opacity="0.7"/><path d="M12 6l-5 3v4c0 3 2.2 5.5 5 6.5 2.8-1 5-3.5 5-6.5V9l-5-3z" fill="white" opacity="0.4"/></svg>`,
-  perplexity: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/><circle cx="11" cy="11" r="3" fill="currentColor" opacity="0.3"/></svg>`,
-};
-
 const CHATBOTS = [
-  { name: "ChatGPT", url: "https://chatgpt.com", icon: "chatgpt", c: "#10a37f" },
-  { name: "Gemini", url: "https://gemini.google.com", icon: "gemini", c: "#4285f4" },
-  { name: "Claude", url: "https://claude.ai", icon: "claude", c: "#d97706" },
-  { name: "Grok", url: "https://grok.x.ai", icon: "grok", c: "#1da1f2" },
-  { name: "Copilot", url: "https://copilot.microsoft.com", icon: "copilot", c: "#7c3aed" },
-  { name: "Perplexity", url: "https://perplexity.ai", icon: "perplexity", c: "#20b2aa" },
+  { name: "ChatGPT", url: "https://chatgpt.com", logo: "/ai-logos/chatgpt.png", c: "#10a37f" },
+  { name: "Gemini", url: "https://gemini.google.com", logo: "/ai-logos/gemini.webp", c: "#4285f4" },
+  { name: "Claude", url: "https://claude.ai", logo: "/ai-logos/claude.webp", c: "#d97706" },
+  { name: "Grok", url: "https://grok.x.ai", logo: "/ai-logos/grok.webp", c: "#1da1f2" },
+  { name: "Copilot", url: "https://copilot.microsoft.com", logo: "/ai-logos/copilot.webp", c: "#7c3aed" },
+  { name: "Perplexity", url: "https://perplexity.ai", logo: "/ai-logos/perplexity.webp", c: "#20b2aa" },
 ];
 
 const EXAMPLES = [
@@ -145,7 +135,7 @@ export default function Home() {
             }}
             onMouseOver={e => { e.currentTarget.style.background = "rgba(255,255,255,0.9)"; e.currentTarget.style.borderColor = b.c; e.currentTarget.style.boxShadow = `0 6px 20px ${b.c}30, inset 0 2px 0 rgba(255,255,255,0.8)`; e.currentTarget.style.transform = "scale(1.1)"; }}
             onMouseOut={e => { e.currentTarget.style.background = "rgba(255,255,255,0.65)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.8)"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(0,0,0,0.06), inset 0 2px 0 rgba(255,255,255,0.7), inset 0 -1px 3px rgba(0,0,0,0.04)"; e.currentTarget.style.transform = "scale(1)"; }}
-            ><span style={{ width: 24, height: 24 }} dangerouslySetInnerHTML={{ __html: CHATBOT_ICONS[b.icon] }} /></a>
+            ><img src={b.logo} alt={b.name} style={{ width: 30, height: 30, objectFit: "contain", borderRadius: "50%", pointerEvents: "none" }} /></a>
           ))}
         </div>
 
