@@ -197,18 +197,24 @@ class EvidenceRetriever:
 
         reranked = self._rerank(claim_text, all_candidates, k)
 
-        # Fallback: if local evidence is weak, query live Wikipedia API
-        # This gives access to ALL 6.8M English Wikipedia articles
-        max_sim = max((ev.similarity for ev in reranked), default=0)
-        if max_sim < 0.40 and len(reranked) < k:
-            try:
-                wiki_results = self._wiki_api_search(claim_text, max_results=3)
-                if wiki_results:
-                    logger.info(f"Wiki API fallback: found {len(wiki_results)} live results")
-                    reranked.extend(wiki_results)
-                    reranked = reranked[:k]  # cap at top_k
-            except Exception:
-                pass  # fail silently — local results are still available
+        # ALWAYS query live Wikipedia API (6.8M articles) for every claim
+        # This ensures maximum evidence coverage — not just a fallback
+        try:
+            wiki_results = self._wiki_api_search(claim_text, max_results=3)
+            if wiki_results:
+                logger.info(f"Wiki API: {len(wiki_results)} live results for: {claim_text[:50]}")
+                # Merge: keep local results + add wiki results, deduplicate by title
+                local_titles = {ev.title.lower() for ev in reranked}
+                for wev in wiki_results:
+                    if wev.title.lower() not in local_titles:
+                        reranked.append(wev)
+                # Sort by similarity descending, cap at top_k
+                reranked.sort(key=lambda ev: ev.similarity, reverse=True)
+                reranked = reranked[:max(k, 5)]  # keep at least 5 for better NLI
+            else:
+                logger.info(f"Wiki API: 0 results — possible fabrication: {claim_text[:50]}")
+        except Exception:
+            pass  # fail silently — local results are still available
 
         return reranked
 
@@ -332,17 +338,18 @@ class EvidenceRetriever:
                 )
                 for ev, score in scored_cands[:k]
             ]
-            # Wiki API fallback for weak local evidence
-            max_sim = max((ev.similarity for ev in reranked), default=0)
-            if max_sim < 0.40 and len(reranked) < k:
-                try:
-                    wiki_ev = self._wiki_api_search(claims[i], max_results=2)
-                    if wiki_ev:
-                        logger.info(f"Wiki API fallback for claim {i}: {len(wiki_ev)} results")
-                        reranked.extend(wiki_ev)
-                        reranked = reranked[:k]
-                except Exception:
-                    pass
+            # ALWAYS query Wikipedia API for every claim
+            try:
+                wiki_ev = self._wiki_api_search(claims[i], max_results=2)
+                if wiki_ev:
+                    local_titles = {ev.title.lower() for ev in reranked}
+                    for wev in wiki_ev:
+                        if wev.title.lower() not in local_titles:
+                            reranked.append(wev)
+                    reranked.sort(key=lambda ev: ev.similarity, reverse=True)
+                    reranked = reranked[:max(k, 5)]
+            except Exception:
+                pass
 
             results.append(reranked)
 

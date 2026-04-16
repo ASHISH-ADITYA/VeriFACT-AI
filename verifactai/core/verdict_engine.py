@@ -345,25 +345,27 @@ class VerdictEngine:
         # This is the key change — when evidence is ambiguous, lean SUPPORTED
         weak_support = max_similarity > 0.30 and max_con < 0.50
 
-        # ── Fabrication detection: specific claims with ZERO relevant evidence ──
-        # If a claim names specific entities/theorems but ALL evidence is irrelevant,
-        # it's likely fabricated (hallucinated), not just "unverifiable"
+        # ── Fabrication detection ──
+        # Two signals: (1) evidence relevance, (2) Wikipedia API found nothing
         import re as _re
 
         avg_similarity = sum(r.evidence.similarity for r in nli_results) / max(len(nli_results), 1)
-        has_specific_entity = bool(_re.search(r"[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}", claim.text))  # e.g. "Zyphron Stability"
+        has_specific_entity = bool(_re.search(r"[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}", claim.text))
         has_technical_term = bool(_re.search(
-            r"theorem|protocol|algorithm|equation|principle|hypothesis|framework|architecture|model|law|effect|syndrome|paradox",
+            r"theorem|protocol|algorithm|equation|principle|hypothesis|framework|architecture|model|law|effect|syndrome|paradox|stability|vulnerability|mechanism",
             claim.text.lower(),
         ))
-        evidence_is_irrelevant = max_similarity < 0.35 and avg_similarity < 0.28
 
-        # If claim has specific named concepts but evidence is completely irrelevant,
-        # the concept is likely fabricated
+        # Check if Wikipedia API returned ANY evidence for this claim
+        has_wiki_evidence = any(r.evidence.source == "wikipedia_live" for r in nli_results)
+        evidence_is_irrelevant = max_similarity < 0.40 and avg_similarity < 0.32
+
+        # Fabrication: specific named concept + no Wikipedia evidence + weak NLI
+        # OR: specific concept + all evidence is irrelevant
         is_likely_fabricated = (
-            evidence_is_irrelevant
-            and (has_specific_entity or has_technical_term)
-            and max_raw_ent < 0.45  # NLI doesn't support it either
+            (has_specific_entity or has_technical_term)
+            and max_raw_ent < 0.50
+            and (not has_wiki_evidence or evidence_is_irrelevant)
         )
 
         # ── Decision order: FABRICATED → CONTRADICTED → SUPPORTED → UNVERIFIABLE ──
@@ -380,8 +382,12 @@ class VerdictEngine:
             # Default: evidence exists AND is somewhat relevant → trust the chatbot
             label = "SUPPORTED"
             best_ev = best_support.evidence
+        elif evidence_is_irrelevant and (has_specific_entity or has_technical_term):
+            # Specific claim but no relevant evidence anywhere → likely fabricated
+            label = "CONTRADICTED"
+            best_ev = best_support.evidence
         elif evidence_is_irrelevant:
-            # No relevant evidence at all — genuinely can't verify
+            # Generic claim with no evidence — genuinely can't verify
             label = "UNVERIFIABLE"
             best_ev = best_support.evidence
         else:
