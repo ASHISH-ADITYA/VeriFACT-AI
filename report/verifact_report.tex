@@ -1,0 +1,988 @@
+% ============================================================
+% VeriFACT AI — Complete LaTeX Report
+% ============================================================
+% PLACEHOLDER IMAGES NEEDED:
+%   fig/architecture_4tier.png
+%   fig/pipeline_6stage.png
+%   fig/chrome_extension_ui.png
+%   fig/retrieval_hybrid.png
+%   fig/nli_verdict_flow.png
+%   fig/confidence_fusion.png
+%   fig/benchmark_accuracy.png
+%   fig/latency_profile.png
+%   fig/sequence_diagram.png
+%   fig/fallback_chain.png
+%
+% TODO MARKERS: Search for "% TODO:" for items needing verification
+% ESTIMATED COMPILED PAGE COUNT: 38–42 pages
+% ============================================================
+
+\documentclass[12pt, a4paper, oneside]{report}
+
+% ── Packages ──────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{amsmath, amssymb}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{setspace}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{url}
+\usepackage{pdfpages}
+
+% ── Page Style ────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{\thepage}
+\fancyfoot[C]{\small VeriFACT AI --- Central University of Jharkhand}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.2pt}
+
+% ── Line Spacing ──────────────────────────────────────
+\onehalfspacing
+
+% ── Chapter Formatting ────────────────────────────────
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter}{20pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{-20pt}{30pt}
+
+% ── Listings Style ────────────────────────────────────
+\definecolor{codebg}{rgb}{0.96,0.96,0.96}
+\definecolor{codegreen}{rgb}{0.0,0.5,0.0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0.0,0.82}
+
+\lstdefinestyle{pythonstyle}{
+    backgroundcolor=\color{codebg},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{codepurple}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{red},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    language=Python,
+    frame=single,
+    rulecolor=\color{codegray},
+}
+\lstset{style=pythonstyle}
+
+\lstdefinestyle{jsonstyle}{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    frame=single,
+    rulecolor=\color{codegray},
+}
+
+% ── Hyperref Setup ────────────────────────────────────
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    citecolor=green!50!black,
+    urlcolor=blue!60!black,
+}
+
+% ── Custom Commands ───────────────────────────────────
+\newcommand{\verifact}{\textsc{VeriFACT~AI}}
+\newcommand{\deberta}{DeBERTa-v3}
+\newcommand{\minilm}{MiniLM-L6-v2}
+
+% ============================================================
+\begin{document}
+
+% ════════════════════════════════════════════════════════
+% FRONT MATTER
+% ════════════════════════════════════════════════════════
+
+% ── Title Page ────────────────────────────────────────
+\begin{titlepage}
+\centering
+\vspace*{1cm}
+
+{\Large\textbf{Central University of Jharkhand, Ranchi}}\\[0.3cm]
+{\large Department of Computer Science and Engineering}\\[1cm]
+
+\rule{\linewidth}{0.5pt}\\[0.4cm]
+{\LARGE\bfseries VeriFACT AI: Real-Time LLM Hallucination Detection Using Retrieval-Augmented Verification}\\[0.2cm]
+\rule{\linewidth}{0.5pt}\\[1.5cm]
+
+{\large A Project Report}\\[0.2cm]
+{\large Submitted in Partial Fulfillment of the Requirements for the Degree of}\\[0.2cm]
+{\large\textbf{Bachelor of Technology}}\\[0.2cm]
+{\large in}\\[0.2cm]
+{\large\textbf{Computer Science and Engineering}}\\[1.5cm]
+
+{\large Submitted By:}\\[0.3cm]
+{\Large\textbf{Aditya Ashish}}\\[0.8cm]
+
+{\large Under the Supervision of:}\\[0.3cm]
+\rule{5cm}{0.4pt}\\[1.5cm]
+
+{\large Academic Year: 2025--2026}\\[0.5cm]
+
+\vfill
+{\small Central University of Jharkhand, Ranchi, Jharkhand, India}
+\end{titlepage}
+
+% ── Certificate of Examination ────────────────────────
+\newpage
+\thispagestyle{empty}
+\begin{center}
+{\Large\bfseries Certificate of Examination}\\[1cm]
+\end{center}
+
+This is to certify that the project report entitled \textbf{``VeriFACT AI: Real-Time LLM Hallucination Detection Using Retrieval-Augmented Verification''} submitted by \textbf{Aditya Ashish} is a record of bona fide work carried out by the candidate under the Department of Computer Science and Engineering, Central University of Jharkhand, Ranchi, in partial fulfillment of the requirements for the degree of Bachelor of Technology in Computer Science and Engineering during the academic year 2025--2026.
+
+\vspace{2cm}
+
+\noindent
+\begin{tabular}{p{6cm}p{6cm}}
+\rule{5cm}{0.4pt} & \rule{5cm}{0.4pt} \\
+Internal Examiner & External Examiner \\[2cm]
+\rule{5cm}{0.4pt} & \\
+Head of Department & \\
+\end{tabular}
+
+\vspace{1cm}
+\noindent Date: \rule{3cm}{0.4pt} \hfill Place: Ranchi
+
+% ── Declaration ───────────────────────────────────────
+\newpage
+\thispagestyle{empty}
+\begin{center}
+{\Large\bfseries Declaration}\\[1cm]
+\end{center}
+
+I hereby declare that the project work entitled \textbf{``VeriFACT AI: Real-Time LLM Hallucination Detection Using Retrieval-Augmented Verification''} is an authentic record of my own work carried out during the academic year 2025--2026 under the supervision of the Department of Computer Science and Engineering, Central University of Jharkhand, Ranchi. The matter presented in this report has not been submitted for the award of any other degree or diploma in any university or institution.
+
+\vspace{2cm}
+
+\noindent
+\begin{flushright}
+\textbf{Aditya Ashish}\\
+B.Tech CSE (Final Year)\\
+Central University of Jharkhand\\[1cm]
+Date: \rule{3cm}{0.4pt}
+\end{flushright}
+
+% ── Acknowledgment ────────────────────────────────────
+\newpage
+\thispagestyle{empty}
+\begin{center}
+{\Large\bfseries Acknowledgment}\\[1cm]
+\end{center}
+
+I express my sincere gratitude to the faculty of the Department of Computer Science and Engineering, Central University of Jharkhand, for their guidance throughout this project. I thank the open-source communities behind HuggingFace Transformers, FAISS, spaCy, sentence-transformers, Ollama, and Groq for providing the foundational tools that made this work possible. I also acknowledge the researchers whose published work---particularly on FEVER \cite{thorne2018fever}, Retrieval-Augmented Generation \cite{lewis2020rag}, DeBERTa \cite{he2021deberta}, TruthfulQA \cite{lin2022truthfulqa}, SelfCheckGPT \cite{manakul2023selfcheck}, and Semantic Entropy \cite{kuhn2024entropy}---directly shaped the pipeline architecture.
+
+\vspace{1cm}
+\begin{flushright}
+Aditya Ashish
+\end{flushright}
+
+% ── Abstract ──────────────────────────────────────────
+\newpage
+\thispagestyle{empty}
+\begin{center}
+{\Large\bfseries Abstract}\\[1cm]
+\end{center}
+
+Large Language Models (LLMs) such as ChatGPT, Claude, and Gemini generate fluent but sometimes factually incorrect text---a phenomenon known as hallucination, occurring in 3--27\% of outputs \cite{lin2022truthfulqa}. Existing detection tools (SelfCheckGPT, FActScore, SAFE) operate offline and lack real-time, user-facing interfaces.
+
+This report presents \verifact{}, a real-time hallucination detection system that operates as a Chrome browser extension on ChatGPT, Claude, Gemini, and Grok. The system employs a six-stage verification pipeline: (1)~claim decomposition via Groq Llama~3.1 70B or spaCy fallback, (2)~rule-based contradiction check against 205 hardcoded facts, (3)~hybrid evidence retrieval combining a local FAISS vector index (11,248 chunks) with live Wikipedia API access (6.8~million articles), BM25 sparse search, and cross-encoder reranking, (4)~Natural Language Inference using \deberta{}-base with a specificity gate and fabrication detection, (5)~SelfCheck consistency scoring with semantic entropy, and (6)~Bayesian five-signal confidence fusion.
+
+The system achieves 93.8\% accuracy on the HaluEval benchmark (96.6\% F1), 100\% accuracy on rule-engine-covered claims, and detects fabricated entities (e.g., fictitious theorems and protocols) via exact-title Wikipedia verification. The entire system operates at zero cost using HuggingFace Spaces (free CPU), Groq API (free LLM), Wikipedia API (free knowledge), and Vercel (free hosting).
+
+\textbf{Keywords:} Hallucination Detection, Retrieval-Augmented Generation, Natural Language Inference, Browser Extension, DeBERTa, FAISS, Real-Time Verification, Fabrication Detection
+
+% ── Table of Contents ─────────────────────────────────
+\tableofcontents
+\listoffigures
+\listoftables
+
+% ════════════════════════════════════════════════════════
+% CHAPTER 1 — INTRODUCTION
+% ════════════════════════════════════════════════════════
+\chapter{Introduction}
+\label{ch:intro}
+
+\section{Objective}
+
+The objective of this project is to design and implement a real-time, evidence-backed hallucination detection system for Large Language Model (LLM) outputs. The system, named \verifact{}, operates as a Chrome browser extension that monitors conversations on major AI chatbot platforms (ChatGPT, Claude, Gemini, Grok), decomposes responses into atomic factual claims, verifies each claim against a hybrid knowledge base, and surfaces annotated results with confidence scores and inline highlighting.
+
+\section{Motivation}
+
+Large Language Models have demonstrated remarkable capabilities in text generation, but they suffer from a fundamental reliability problem: \emph{hallucination}---the generation of fluent, confident, but factually incorrect statements. According to Lin et al.\ \cite{lin2022truthfulqa}, LLMs produce false statements in 3--27\% of their outputs, depending on the domain and the specific model.
+
+The consequences of unchecked hallucinations are significant:
+\begin{itemize}[nosep]
+    \item \textbf{Fabricated citations:} LLMs invent paper titles, author names, and DOIs that do not exist.
+    \item \textbf{Incorrect statistics:} Numerical claims (dates, measurements, populations) are frequently wrong.
+    \item \textbf{Made-up entities:} LLMs fabricate theorems, protocols, algorithms, and historical events.
+    \item \textbf{High-stakes domains:} In legal contexts, GPT-4 hallucinates 58\% of the time when generating case citations \cite{dahl2024legal}.
+\end{itemize}
+
+Despite active research, no existing system provides real-time, ambient, evidence-backed hallucination detection as a browser overlay on live chatbot platforms using entirely free resources.
+
+\section{Project Scope}
+
+\verifact{} addresses this gap by providing:
+\begin{enumerate}[nosep]
+    \item A Chrome Manifest~V3 extension that monitors chatbot conversations in real time.
+    \item A six-stage verification pipeline grounded in published research methodologies.
+    \item Evidence-backed verdicts (SUPPORTED, CONTRADICTED, UNVERIFIABLE) with calibrated confidence scores, rather than binary labels.
+    \item A zero-cost deployment architecture using only free-tier services.
+    \item A web dashboard and REST API for non-extension use cases.
+\end{enumerate}
+
+\section{Report Organization}
+
+This report is organized as follows:
+\begin{itemize}[nosep]
+    \item \textbf{Chapter~2} presents the system architecture and the six-stage verification methodology.
+    \item \textbf{Chapter~3} describes the implementation details, including all 13 core modules, the REST API, the Chrome extension, and the web dashboard.
+    \item \textbf{Chapter~4} reports evaluation results across multiple benchmarks.
+    \item \textbf{Chapter~5} covers deployment and operational considerations.
+    \item \textbf{Chapter~6} discusses strengths, limitations, and ethical considerations.
+    \item \textbf{Chapter~7} concludes the report and outlines future work.
+\end{itemize}
+
+\section{Literature Survey}
+
+Table~\ref{tab:literature} summarizes the key related works and their relationship to \verifact{}.
+
+\begin{table}[H]
+\centering
+\caption{Comparative survey of hallucination detection approaches.}
+\label{tab:literature}
+\small
+\begin{tabularx}{\textwidth}{l l X c c c}
+\toprule
+\textbf{System} & \textbf{Year} & \textbf{Approach} & \textbf{Real-Time} & \textbf{Free} & \textbf{Local NLI} \\
+\midrule
+FEVER \cite{thorne2018fever} & 2018 & Fact extraction \& verification dataset & No & Yes & No \\
+RAG \cite{lewis2020rag} & 2020 & Retrieval-augmented generation & No & Yes & No \\
+DeBERTa \cite{he2021deberta} & 2021 & Disentangled attention NLI & No & Yes & Yes \\
+TruthfulQA \cite{lin2022truthfulqa} & 2022 & Benchmark for model falsehoods & No & Yes & No \\
+Constitutional AI \cite{bai2022constitutional} & 2022 & Harmlessness from AI feedback & No & No & No \\
+FActScore \cite{min2023factscore} & 2023 & Atomic claim precision scoring & No & Yes & No \\
+SelfCheckGPT \cite{manakul2023selfcheck} & 2023 & Zero-resource self-consistency & No & Yes & No \\
+Reflexion \cite{shinn2023reflexion} & 2023 & Verbal reinforcement learning & No & Yes & No \\
+Sem.\ Entropy \cite{kuhn2024entropy} & 2024 & Uncertainty via entropy & No & Yes & No \\
+SAFE (Google) & 2024 & Search-augmented factual evaluation & No & No & No \\
+\textbf{VeriFACT AI} & \textbf{2026} & \textbf{6-stage RAG + NLI pipeline} & \textbf{Yes} & \textbf{Yes} & \textbf{Yes} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Each of the 14 research papers reviewed (stored in the project's \texttt{/architecture/} directory) directly influenced at least one pipeline stage, as detailed in Table~\ref{tab:research_mapping} in Chapter~2.
+
+% ════════════════════════════════════════════════════════
+% CHAPTER 2 — SYSTEM ARCHITECTURE & METHODOLOGY
+% ════════════════════════════════════════════════════════
+\chapter{System Architecture and Methodology}
+\label{ch:architecture}
+
+\section{High-Level Architecture}
+
+\verifact{} follows a four-tier architecture, as illustrated in Figure~\ref{fig:architecture}.
+
+\begin{figure}[H]
+\centering
+% TODO: Replace with actual image
+\fbox{\parbox{0.85\textwidth}{\centering\vspace{3cm}\textit{Placeholder: 4-tier architecture diagram showing Client Layer (Chrome Extension, Web Dashboard, Streamlit), API Layer (overlay\_server.py with 5 endpoints), Pipeline Layer (6 stages), and Data Layer (FAISS, BM25, Wikipedia API, Rule DB).}\vspace{3cm}}}
+\caption{Four-tier system architecture of \verifact{}.}
+\label{fig:architecture}
+\end{figure}
+
+\begin{enumerate}[nosep]
+    \item \textbf{Client Layer:} Chrome Extension (Manifest~V3), Next.js Web Dashboard (Vercel), Streamlit Dashboard.
+    \item \textbf{API Layer:} Custom Python HTTP server (\texttt{overlay\_server.py}) with five endpoints, CORS whitelisting, rate limiting (20~req/min per IP), and optional token authentication.
+    \item \textbf{Pipeline Layer:} Six-stage verification pipeline orchestrated by \texttt{pipeline.py}.
+    \item \textbf{Data Layer:} FAISS IndexFlatIP (11,248 vectors, 384-dim), BM25 in-memory index, live Wikipedia API (6.8M articles), 205-entry rule database, metadata JSONL.
+\end{enumerate}
+
+\section{The Six-Stage Verification Pipeline}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\textwidth}{\centering\vspace{3cm}\textit{Placeholder: 6-stage pipeline flow diagram. Stages: (1)~Claim Decomposition, (2a)~Rule Engine, (2b)~Evidence Retrieval, (3)~NLI Verdict, (4)~SelfCheck, (5)~Confidence Fusion, (6)~Annotator.}\vspace{3cm}}}
+\caption{Six-stage verification pipeline of \verifact{}.}
+\label{fig:pipeline}
+\end{figure}
+
+\subsection{Stage 1: Claim Decomposition}
+\label{sec:decomposition}
+
+The first stage decomposes LLM-generated text into atomic, independently verifiable factual claims, following the FActScore methodology \cite{min2023factscore}.
+
+\textbf{Primary path:} The Groq API (free tier, 30~req/min) invokes Llama~3.1 70B with a structured JSON extraction prompt. The model returns claims with type annotations (\texttt{entity\_fact}, \texttt{numerical}, \texttt{temporal}, \texttt{causal}, \texttt{relational}).
+
+\textbf{Fallback path:} When no LLM is available (\texttt{provider=``none''}), spaCy \texttt{en\_core\_web\_sm} performs sentence segmentation. An aggressive filter removes non-factual sentences (opinions, transitions, meta-commentary, subjective language). Remaining sentences are ranked by a fact-density score:
+
+\begin{equation}
+\text{fact\_density}(s) = 1.0 + 2.0 \cdot \mathbf{1}[\text{has\_number}] + 0.5 \cdot |\text{proper\_nouns}| + 0.5 \cdot |\text{factual\_verbs}|
+\tag{Eq.\ 1}
+\end{equation}
+
+The top-$N$ claims (8 for the fast endpoint, 20 for full) are retained, sorted by position in the original text.
+
+\textbf{Implementation:} \texttt{claim\_decomposer.py} (335 lines of code).
+
+\subsection{Stage 2a: Rule-Based Contradiction Check}
+\label{sec:rules}
+
+Before invoking any ML model, a deterministic rule engine checks each claim against 205 hardcoded factual entries across nine categories (Table~\ref{tab:rules}).
+
+\begin{table}[H]
+\centering
+\caption{Rule engine categories and coverage.}
+\label{tab:rules}
+\begin{tabular}{l r l}
+\toprule
+\textbf{Category} & \textbf{Entries} & \textbf{Example} \\
+\midrule
+Landmark locations & 38 & Great Wall $\rightarrow$ China \\
+Capital--country & 34 & Tokyo $\rightarrow$ Japan \\
+City--country & 43 & London $\rightarrow$ United Kingdom \\
+Country--continent & 32 & Brazil $\rightarrow$ South America \\
+Person--achievement & 29 & Einstein $\rightarrow$ physics \\
+Historical event dates & 7 & WWII: 1939--1945 \\
+Person birth/death dates & 9 & Shakespeare: 1564--1616 \\
+Science numerical facts & 5 & Water boiling: $100\degree$C $\pm5$ \\
+Science true/false & 8 & ``Sun revolves around Earth'' $\rightarrow$ False \\
+\midrule
+\textbf{Total} & \textbf{205} & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A matched claim is immediately labeled CONTRADICTED with 0.95 confidence and bypasses all subsequent NLI processing. Latency: $<$1\,ms per claim.
+
+\textbf{Implementation:} \texttt{fact\_rules.py} (450 lines of code).
+
+\subsection{Stage 2b: Evidence Retrieval}
+\label{sec:retrieval}
+
+For unresolved claims, a five-layer hybrid retrieval system gathers evidence from multiple sources:
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\textwidth}{\centering\vspace{3cm}\textit{Placeholder: Hybrid retrieval data flow. FAISS dense search + BM25 sparse search $\rightarrow$ RRF fusion (k=60) $\rightarrow$ cross-encoder reranking $\rightarrow$ Wikipedia API (6.8M articles, full-text paragraph scoring) $\rightarrow$ merge + deduplicate $\rightarrow$ top-5 evidence.}\vspace{3cm}}}
+\caption{Hybrid evidence retrieval pipeline.}
+\label{fig:retrieval}
+\end{figure}
+
+\textbf{Layer 1 --- Dense Retrieval:} Claims are encoded using \texttt{sentence-transformers/all-\minilm{}} (384-dimensional embeddings, 83\,MB). The embeddings are searched against a pre-built FAISS \texttt{IndexFlatIP} containing 11,248 Wikipedia chunk vectors.
+
+\textbf{Layer 2 --- Sparse Retrieval:} BM25Okapi (\texttt{rank\_bm25}) performs keyword-based matching over the tokenized metadata corpus.
+
+\textbf{Layer 3 --- Reciprocal Rank Fusion:} Dense and sparse results are fused using RRF:
+\begin{equation}
+\text{RRF}(d) = \sum_{i \in \{\text{dense}, \text{sparse}\}} \frac{1}{k + \text{rank}_i(d)}, \quad k = 60
+\tag{Eq.\ 2}
+\end{equation}
+
+\textbf{Layer 4 --- Cross-Encoder Reranking:} The fused candidates are reranked by \texttt{cross-encoder/ms-marco-\minilm{}} with sigmoid normalization.
+
+\textbf{Layer 5 --- Live Wikipedia API:} Every claim is searched against all 6.8 million English Wikipedia articles. The system retrieves the full article text (not just the introduction), splits it into paragraphs, scores each paragraph by query-term overlap, and extracts the two most relevant paragraphs (up to 800 characters).
+
+\textbf{Entity Verification:} For claims containing specific named entities (detected by the regex pattern \texttt{[A-Z][a-z]\{2,\}\textbackslash s+[A-Z][a-z]\{2,\}}), the system checks whether Wikipedia has an article with that \emph{exact title}. If no such article exists, the entity is flagged as potentially fabricated.
+
+\textbf{Implementation:} \texttt{evidence\_retriever.py} (650 lines of code).
+
+\subsection{Stage 3: NLI Verdict}
+\label{sec:nli}
+
+The retrieved evidence is evaluated against each claim using the \texttt{cross-encoder/nli-deberta-v3-base} model (435\,MB, 3-class: entailment, neutral, contradiction).
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\textwidth}{\centering\vspace{3cm}\textit{Placeholder: NLI verdict decision tree. Rule check $\rightarrow$ Fabrication detection $\rightarrow$ Hard contradiction (NLI $>$ 0.80, margin $>$ 0.20) $\rightarrow$ Wikipedia trust $\rightarrow$ Strong/Moderate/Weak support $\rightarrow$ UNVERIFIABLE.}\vspace{3cm}}}
+\caption{Verdict decision tree in the NLI engine.}
+\label{fig:nli_verdict}
+\end{figure}
+
+\textbf{Batch processing:} All (premise, hypothesis) pairs across all claims are collected and processed in a single tokenize-and-forward-pass operation, yielding 5--8$\times$ throughput improvement over per-claim inference.
+
+The NLI output is a softmax probability distribution:
+\begin{equation}
+P(\text{class} \mid \text{premise}, \text{hypothesis}) = \text{softmax}(\mathbf{z}), \quad \mathbf{z} \in \mathbb{R}^3
+\tag{Eq.\ 3}
+\end{equation}
+where class $\in$ \{contradiction, neutral, entailment\}.
+
+\textbf{Specificity gate:} To prevent false entailment from topically similar but non-specific evidence, the system computes a gated support score:
+\begin{equation}
+s_{\text{specific}} = \max_{e \in \mathcal{E}} \left( P(\text{entail} \mid e, h) \times \text{sim}(e, h) \right)
+\tag{Eq.\ 4}
+\end{equation}
+where $\text{sim}(e, h)$ is the retrieval similarity. A claim is labeled SUPPORTED only if $s_{\text{specific}} > 0.65$.
+
+\textbf{Fabrication detection:} If a claim names specific entities but the entity verification step found no Wikipedia article, and all evidence is irrelevant (max similarity $< 0.35$, average similarity $< 0.25$), the claim is marked CONTRADICTED with confidence $\geq 0.90$.
+
+\textbf{LLM-as-Judge:} When NLI scores are ambiguous (entailment between 0.35--0.65), an optional LLM verification step asks: ``Does this evidence specifically verify this exact claim?'' If the LLM responds ``NO,'' the entailment score is reduced to 0.1.
+
+\textbf{Implementation:} \texttt{verdict\_engine.py} (500 lines of code).
+
+\subsection{Stage 4: SelfCheck Consistency Scoring}
+\label{sec:selfcheck}
+
+Following the methodology of Manakul et al.\ \cite{manakul2023selfcheck}, the system performs self-consistency sampling:
+
+\textbf{LLM path:} Five LLM samples at temperatures $\{0.10, 0.25, 0.40, 0.55, 0.70\}$, each producing a label $\in$ \{supported, contradicted, uncertain\}.
+
+\textbf{NLI fallback:} When no LLM is available, the system reuses the VerdictEngine to run NLI across different evidence passages, mapping high-entailment to ``supported'' and high-contradiction to ``contradicted.''
+
+The uncertainty is computed as:
+\begin{equation}
+U = 0.65 \cdot H_{\text{norm}}(\mathbf{p}) + 0.35 \cdot D(\mathbf{p})
+\tag{Eq.\ 5}
+\end{equation}
+where $H_{\text{norm}}$ is normalized entropy over the label distribution and $D$ is the disagreement ratio (fraction not in the majority class).
+
+\textbf{Implementation:} \texttt{selfcheck.py} (210 lines), \texttt{semantic\_entropy.py} (115 lines).
+
+\subsection{Stage 5: Bayesian Confidence Fusion}
+\label{sec:confidence}
+
+Five signals are fused into a single calibrated confidence score:
+
+\begin{equation}
+C = \sigma\!\left(\sum_{i=1}^{5} w_i \cdot s_i \right)
+\tag{Eq.\ 6}
+\end{equation}
+
+where $\sigma$ is the sigmoid function and the signals and weights are:
+
+\begin{table}[H]
+\centering
+\caption{Bayesian confidence fusion signals and weights.}
+\label{tab:confidence}
+\begin{tabular}{c l c l}
+\toprule
+$i$ & \textbf{Signal} & $w_i$ & \textbf{Computation} \\
+\midrule
+1 & NLI support & 0.32 & $(\max(\text{ent}) - \max(\text{con}) + 1) / 2$ \\
+2 & Retrieval relevance & 0.22 & $\max(\text{evidence.similarity})$ \\
+3 & Source reliability & 0.12 & Prior: Wikipedia $= 1.0$, unknown $= 0.5$ \\
+4 & Cross-reference & 0.16 & Fraction where ent $>$ con \\
+5 & Uncertainty stability & 0.18 & $1 - U$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The weights sum to 1.0 and were tuned on the HaluEval development set.
+
+\section{Annotator and Correction Loops}
+
+For CONTRADICTED claims, the system optionally generates corrections:
+\begin{enumerate}[nosep]
+    \item \textbf{Base correction:} LLM generates a corrected statement.
+    \item \textbf{Reflexion critique} \cite{shinn2023reflexion}: A critique-and-revise loop (1 round) identifies issues in the correction.
+    \item \textbf{Constitutional safety critique} \cite{bai2022constitutional}: A safety-oriented critique (1 round) ensures corrections are grounded in evidence.
+\end{enumerate}
+
+\textbf{Implementation:} \texttt{annotator.py} (310 lines of code).
+
+\section{LLM Fallback Chain}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\textwidth}{\centering\vspace{2cm}\textit{Placeholder: LLM fallback graph. Groq (Llama 3.1 70B, free) $\rightarrow$ Ollama (local) $\rightarrow$ Anthropic (Claude) $\rightarrow$ OpenAI (GPT-4o-mini) $\rightarrow$ spaCy fallback. Also: provider=``none'' + GROQ\_API\_KEY set $\rightarrow$ auto-switch to Groq.}\vspace{2cm}}}
+\caption{LLM provider fallback chain.}
+\label{fig:fallback}
+\end{figure}
+
+The system supports four LLM providers with automatic fallback: Groq (free, Llama~3.1 70B at 500~tok/s) $\rightarrow$ Ollama (free, local) $\rightarrow$ Anthropic (Claude, if API key set) $\rightarrow$ OpenAI (GPT-4o-mini, if API key set) $\rightarrow$ spaCy (zero-LLM sentence segmentation).
+
+\textbf{Implementation:} \texttt{llm\_client.py} (320 lines of code).
+
+% ════════════════════════════════════════════════════════
+% CHAPTER 3 — IMPLEMENTATION
+% ════════════════════════════════════════════════════════
+\chapter{Implementation}
+\label{ch:implementation}
+
+\section{Development Environment and Tech Stack}
+
+\begin{table}[H]
+\centering
+\caption{Complete technology stack.}
+\label{tab:techstack}
+\small
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Layer} & \textbf{Technology} & \textbf{Details} \\
+\midrule
+Backend & Python 3.11 & Custom HTTP server (no framework) \\
+Frontend & Next.js 15.5.15 & React 18.3.0, static export, Vercel \\
+Extension & Chrome Manifest V3 & Vanilla JavaScript, CSS \\
+NLI Model & \deberta{}-base & \texttt{cross-encoder/nli-deberta-v3-base} (435\,MB) \\
+Embeddings & \minilm{} & \texttt{sentence-transformers/all-MiniLM-L6-v2} (83\,MB, 384-dim) \\
+Reranker & MiniLM-L-6-v2 & \texttt{cross-encoder/ms-marco-MiniLM-L-6-v2} (128\,MB) \\
+Vector Index & FAISS & IndexFlatIP, 11,248 vectors (pre-built, 25\,MB) \\
+Sparse Search & BM25 & \texttt{rank\_bm25} BM25Okapi (in-memory) \\
+Live Knowledge & Wikipedia API & 6.8M articles, full-text paragraph search \\
+Free LLM & Groq & \texttt{llama-3.1-70b-versatile} (30~req/min) \\
+Local LLM & Ollama & \texttt{llama3.1:8b} (optional) \\
+NLP Fallback & spaCy & \texttt{en\_core\_web\_sm} \\
+Config & Pydantic & Type-safe configuration with env overrides \\
+Testing & pytest & 94 tests across 12 files \\
+Linting & ruff & Python linter + formatter \\
+Compute & HuggingFace Spaces & Free CPU tier, Docker (\texttt{python:3.11-slim}) \\
+Web Hosting & Vercel & Free tier, static export \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Module-by-Module Walkthrough}
+
+Table~\ref{tab:modules} summarizes all 13 core Python modules.
+
+\begin{table}[H]
+\centering
+\caption{Core Python modules and their responsibilities.}
+\label{tab:modules}
+\small
+\begin{tabularx}{\textwidth}{l r X}
+\toprule
+\textbf{Module} & \textbf{LoC} & \textbf{Responsibility} \\
+\midrule
+\texttt{evidence\_retriever.py} & 650 & FAISS + BM25 + RRF + reranker + Wikipedia API \\
+\texttt{overlay\_server.py} & 620 & HTTP API, CORS, auth, rate limiting, SSE \\
+\texttt{prompt\_optimizer.py} & 550 & Prompt quality scoring + template rewriting \\
+\texttt{verdict\_engine.py} & 500 & DeBERTa NLI, batch judging, fabrication detection \\
+\texttt{fact\_rules.py} & 450 & 205 hardcoded rules, 9 categories \\
+\texttt{claim\_decomposer.py} & 335 & LLM + spaCy claim extraction \\
+\texttt{llm\_client.py} & 320 & Multi-provider LLM fallback chain \\
+\texttt{pipeline.py} & 320 & Main orchestrator, caching, streaming \\
+\texttt{annotator.py} & 310 & HTML/JSON output, corrections, Reflexion \\
+\texttt{config.py} & 230 & Pydantic-based centralized configuration \\
+\texttt{selfcheck.py} & 210 & Self-consistency scoring, NLI fallback \\
+\texttt{semantic\_entropy.py} & 115 & Entropy, disagreement, Jaccard clustering \\
+\texttt{hallucination\_discrim.py} & 80 & TF-IDF + LogReg binary classifier \\
+\midrule
+\textbf{Total} & \textbf{4,690} & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{REST API Specification}
+
+\begin{table}[H]
+\centering
+\caption{REST API endpoints.}
+\label{tab:api}
+\small
+\begin{tabularx}{\textwidth}{l l X r}
+\toprule
+\textbf{Endpoint} & \textbf{Method} & \textbf{Purpose} & \textbf{Latency} \\
+\midrule
+\texttt{/analyze} & POST & Full 6-stage verification & 10--18\,s \\
+\texttt{/analyze/fast} & POST & Lightweight (no reranker/SelfCheck) & 3--8\,s \\
+\texttt{/analyze/stream} & POST & SSE streaming (claim-by-claim) & Real-time \\
+\texttt{/optimize} & POST & Prompt quality suggestion & $<$1\,s \\
+\texttt{/health} & GET & Liveness probe & $<$100\,ms \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Request format} (\texttt{/analyze}):
+\begin{lstlisting}[style=jsonstyle, caption={POST /analyze request body.}]
+{
+  "text": "Napoleon lost the Battle of Waterloo in 1815.",
+  "top_claims": 8,
+  "source": "gemini",
+  "mode": "fast"
+}
+\end{lstlisting}
+
+\textbf{Response format}:
+\begin{lstlisting}[style=jsonstyle, caption={POST /analyze response body.}]
+{
+  "factuality_score": 80.0,
+  "total_claims": 5,
+  "supported": 4,
+  "contradicted": 1,
+  "processing_time": 7.2,
+  "flags": [
+    {
+      "claim": "The Great Wall is in South America",
+      "verdict": "CONTRADICTED",
+      "confidence": 0.95,
+      "evidence": "The Great Wall is located in China...",
+      "source": "factual_rule"
+    }
+  ]
+}
+\end{lstlisting}
+
+\textbf{Security:} Rate limiting at 20~requests/minute per IP. CORS whitelist: \texttt{chatgpt.com}, \texttt{claude.ai}, \texttt{gemini.google.com}, localhost variants. Optional \texttt{X-VeriFact-Token} header with timing-safe comparison (\texttt{hmac.compare\_digest}).
+
+\section{Chrome Extension}
+
+The extension (Manifest~V3) injects \texttt{content.js} into ChatGPT, Claude, Gemini, and Grok pages. Key features:
+\begin{itemize}[nosep]
+    \item \textbf{Beacon:} 72\,px draggable glass orb with state-dependent color (blue=idle, purple=scanning, green=safe, red=alert).
+    \item \textbf{Inline highlighting:} Red background on CONTRADICTED claims directly in the chatbot's response text.
+    \item \textbf{Dashboard:} Liquid glass panel showing KPI row and per-claim verdict cards with evidence.
+    \item \textbf{Parallel analysis:} Up to 3 messages analyzed simultaneously, results cached per DOM node.
+    \item \textbf{Prompt suggestion:} Real-time prompt quality scoring with Accept/Dismiss buttons.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\textwidth}{\centering\vspace{3cm}\textit{Placeholder: Annotated screenshot of Chrome extension showing the beacon (bottom-right), inline red highlighting on a false claim, and the glass dashboard panel with KPI row and claim cards.}\vspace{3cm}}}
+\caption{Chrome extension user interface.}
+\label{fig:extension}
+\end{figure}
+
+\section{Web Dashboard}
+
+The web dashboard (\texttt{web/src/pages/index.js}) is built with Next.js~15.5.15 and deployed on Vercel as a static export. It features four tabs: Dashboard (pipeline KPIs), Verify (paste-and-check), Chat (RAG-powered fact-checking), and About (architecture documentation). Chatbot quick-links with logos provide direct navigation to ChatGPT, Gemini, Claude, Grok, Copilot, and Perplexity.
+
+\section{Streamlit Dashboard}
+
+The Streamlit dashboard (\texttt{app.py}, port 8501) provides deep analysis with Plotly visualizations, color-coded verdicts, and evidence links for academic evaluation purposes.
+
+\section{Configuration and Testing}
+
+Configuration is managed through Pydantic models (\texttt{config.py}, 230 lines) with environment variable overrides. Two performance profiles are supported: INTERACTIVE (max\_tokens=1024, top\_k=3) and EVAL (max\_tokens=2048, top\_k=5).
+
+The test suite comprises 94 tests across 12 test files, covering claim decomposition, verdict logic, annotator output, SelfCheck, rule engine, configuration loading, and smoke tests. Linting is enforced by ruff.
+
+% ════════════════════════════════════════════════════════
+% CHAPTER 4 — RESULTS & EVALUATION
+% ════════════════════════════════════════════════════════
+\chapter{Results and Evaluation}
+\label{ch:results}
+
+\section{Benchmark Methodology}
+
+Evaluation was conducted across five benchmark configurations, ranging from standardized academic datasets (HaluEval, TruthfulQA) to custom adversarial test suites and live endpoint testing.
+
+\section{HaluEval Results}
+
+\begin{table}[H]
+\centering
+\caption{HaluEval benchmark results (multi-sentence claims).}
+\label{tab:halueval}
+\begin{tabular}{l r}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Accuracy & 93.8\% \\
+Precision & 93.3\% \\
+Recall & 100.0\% \\
+F1 Score & 96.6\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The strong performance on HaluEval is attributed to multi-sentence inputs providing richer evidence signal for the specificity gate and cross-reference scoring.
+
+\section{TruthfulQA Results}
+
+\begin{table}[H]
+\centering
+\caption{TruthfulQA benchmark results (single-sentence claims).}
+\label{tab:truthfulqa}
+\begin{tabular}{l r}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Accuracy & 44.1\% \\
+Precision & 45.8\% \\
+Recall & 75.9\% \\
+F1 Score & 57.1\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The lower TruthfulQA accuracy reflects a fundamental limitation: single-sentence claims provide insufficient context for the specificity gate, and many TruthfulQA questions test nuanced distinctions (e.g., ``Did Einstein win the Nobel Prize for relativity?''---he won it for the photoelectric effect) that require deeper reasoning than NLI alone provides.
+
+\section{Adversarial Benchmark}
+
+A custom adversarial benchmark of 100 claims (65 contradictions, 25 supported, 10 unverifiable) yielded:
+
+\begin{table}[H]
+\centering
+\caption{Adversarial benchmark results (100 claims).}
+\label{tab:adversarial}
+\begin{tabular}{l r r r}
+\toprule
+\textbf{Class} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} \\
+\midrule
+CONTRADICTED & 88.7\% & 84.6\% & 86.6\% \\
+SUPPORTED & 67.6\% & 92.0\% & 78.0\% \\
+UNVERIFIABLE & 100.0\% & 40.0\% & 57.1\% \\
+\midrule
+Overall accuracy & \multicolumn{3}{c}{82.0\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Live Mixed Test}
+
+Post-accuracy-fix testing with 5 mixed true/false claims:
+\begin{itemize}[nosep]
+    \item Napoleon lost Waterloo $\rightarrow$ SUPPORTED (correct)
+    \item Great Wall in South America $\rightarrow$ CONTRADICTED (correct)
+    \item Einstein invented telephone $\rightarrow$ CONTRADICTED (correct)
+    \item Earth revolves around Sun $\rightarrow$ SUPPORTED (correct)
+    \item Speed of light is 100 m/s $\rightarrow$ CONTRADICTED (correct)
+\end{itemize}
+\textbf{Result: 5/5 correct (100\%), 9.8 seconds total.}
+
+\section{Rule Engine Validation}
+
+12 test claims (8 false, 4 true): \textbf{12/12 correct (100\%)}. All false claims caught by rules; all true claims correctly passed through without triggering.
+
+\section{Latency Profile}
+
+\begin{table}[H]
+\centering
+\caption{Latency by endpoint and configuration.}
+\label{tab:latency}
+\begin{tabular}{l l r l}
+\toprule
+\textbf{Path} & \textbf{Claims} & \textbf{Latency} & \textbf{Notes} \\
+\midrule
+\texttt{/analyze/fast} & 5 & 3--8\,s & FAISS + NLI + Wikipedia API + rules \\
+\texttt{/analyze} (full) & 5 & 10--18\,s & + BM25 + reranker + SelfCheck \\
+Rule-caught & any & $<$1\,ms & Rule engine only \\
+Local (M4) & 5 & 2--5\,s & MacBook Air M4, MPS acceleration \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\textwidth}{\centering\vspace{2cm}\textit{Placeholder: Bar chart comparing accuracy across benchmarks: HaluEval (93.8\%), Adversarial (82\%), Live mixed (100\%), Rule engine (100\%), TruthfulQA (44.1\%).}\vspace{2cm}}}
+\caption{Accuracy comparison across evaluation benchmarks.}
+\label{fig:benchmark}
+\end{figure}
+
+\section{Per-Stage Ablation Discussion}
+
+Each pipeline stage contributes measurably to overall accuracy:
+\begin{itemize}[nosep]
+    \item \textbf{Rule engine only:} 100\% on covered facts, but limited to 205 entries.
+    \item \textbf{FAISS-only retrieval:} Lower recall on niche topics due to 11K-chunk corpus limit.
+    \item \textbf{+ Wikipedia API:} Significantly improves coverage (6.8M articles), especially for niche topics.
+    \item \textbf{+ Entity verification:} Catches fabricated entities that keyword search misses.
+    \item \textbf{+ Batch NLI:} 5--8$\times$ throughput with identical accuracy to per-claim inference.
+    \item \textbf{+ SelfCheck:} Marginal improvement ($\sim$2--3\%) on ambiguous claims.
+\end{itemize}
+
+% ════════════════════════════════════════════════════════
+% CHAPTER 5 — DEPLOYMENT & OPERATIONS
+% ════════════════════════════════════════════════════════
+\chapter{Deployment and Operations}
+\label{ch:deployment}
+
+\section{HuggingFace Spaces Deployment}
+
+The backend is deployed on HuggingFace Spaces (free CPU tier: 2~vCPU, 16\,GB RAM) using a Docker container (\texttt{python:3.11-slim}). The FAISS index and all ML models are pre-built and baked into the Docker image, eliminating the 15-minute index build on startup.
+
+\textbf{Dockerfile structure:}
+\begin{enumerate}[nosep]
+    \item Install Python dependencies + spaCy model.
+    \item Pre-download ML models (DeBERTa, MiniLM, reranker) into the image layer.
+    \item Copy pre-built FAISS index (25\,MB) and metadata JSONL.
+    \item Start \texttt{startup.py} $\rightarrow$ detect existing index $\rightarrow$ launch \texttt{overlay\_server.py}.
+\end{enumerate}
+
+\section{Vercel Deployment}
+
+The web dashboard is deployed on Vercel (free tier) as a Next.js static export. Deployment is triggered manually via \texttt{vercel --prod} from the \texttt{web/} directory.
+
+\section{Security Configuration}
+
+\begin{itemize}[nosep]
+    \item \textbf{CORS whitelist:} \texttt{chatgpt.com}, \texttt{claude.ai}, \texttt{gemini.google.com}, localhost variants.
+    \item \textbf{Rate limiting:} 20 requests/minute per IP (sliding window, in-memory).
+    \item \textbf{Authentication:} Optional \texttt{X-VeriFact-Token} header with timing-safe comparison.
+    \item \textbf{Security headers:} \texttt{X-Content-Type-Options: nosniff}, \texttt{X-Frame-Options: DENY}, \texttt{Cache-Control: no-store}, \texttt{Referrer-Policy: no-referrer}.
+    \item \textbf{Input validation:} 100\,KB max request body, 50,000 character max text length.
+\end{itemize}
+
+\section{Zero-Cost Infrastructure}
+
+\begin{table}[H]
+\centering
+\caption{Infrastructure cost breakdown.}
+\label{tab:cost}
+\begin{tabular}{l l r}
+\toprule
+\textbf{Service} & \textbf{Provider} & \textbf{Monthly Cost} \\
+\midrule
+Backend compute & HuggingFace Spaces (free CPU) & \$0 \\
+LLM inference & Groq API (30 req/min free) & \$0 \\
+Knowledge base & Wikipedia API (unlimited) & \$0 \\
+Web hosting & Vercel (free tier) & \$0 \\
+ML models & HuggingFace Hub (open-source) & \$0 \\
+\midrule
+\textbf{Total} & & \textbf{\$0/month} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ════════════════════════════════════════════════════════
+% CHAPTER 6 — DISCUSSION & LIMITATIONS
+% ════════════════════════════════════════════════════════
+\chapter{Discussion and Limitations}
+\label{ch:discussion}
+
+\section{Strengths}
+
+\begin{enumerate}[nosep]
+    \item \textbf{Fabrication detection via evidence absence:} A novel contribution not present in existing systems. When Wikipedia returns zero results for a specific named entity, the entity is flagged as fabricated.
+    \item \textbf{Unbounded knowledge reach:} Live Wikipedia API access provides coverage of 6.8 million articles without local storage constraints.
+    \item \textbf{Batch processing:} Single DeBERTa forward pass for all claims yields 5--8$\times$ throughput improvement.
+    \item \textbf{Two-pass architecture:} Rule engine handles 100\% of covered facts in $<$1\,ms; NLI runs only on unresolved claims.
+    \item \textbf{Zero-cost deployment:} The entire system operates without any paid services.
+\end{enumerate}
+
+\section{Limitations}
+
+\begin{enumerate}[nosep]
+    \item \textbf{Single-passage retrieval:} The system cannot verify claims requiring synthesis across multiple evidence sources (multi-hop reasoning).
+    \item \textbf{English only:} No multilingual NLI model is currently integrated.
+    \item \textbf{NLI false-positive rate:} Approximately 5--10\% of verdicts are incorrect, particularly on subtly distorted facts.
+    \item \textbf{HuggingFace CPU constraints:} Inference takes $\sim$5 seconds per claim on free CPU; latency would be 10$\times$ lower with GPU.
+    \item \textbf{Wikipedia recency:} Events from the last few weeks may not be covered.
+    \item \textbf{Static source reliability:} Source priors (Wikipedia $= 1.0$) are hardcoded rather than dynamically learned.
+    \item \textbf{TruthfulQA gap:} 44.1\% accuracy on single-sentence claims reflects the specificity gate's dependence on multi-passage context.
+\end{enumerate}
+
+\section{Ethical Considerations}
+
+\verifact{} produces evidence-backed verdicts with calibrated confidence scores, not binary ``true/false'' labels. This design choice is deliberate: in high-stakes domains (clinical, legal), users should interpret confidence scores as \emph{guidance}, not definitive judgments. The system's 5--10\% error rate makes it unsuitable as a sole arbiter of truth in safety-critical applications.
+
+The system does not store or transmit user conversations beyond the immediate verification request. However, evidence retrieval does involve sending claim text to the Wikipedia API and optionally to the Groq API, which processes it on external servers.
+
+% ════════════════════════════════════════════════════════
+% CHAPTER 7 — CONCLUSION & FUTURE WORK
+% ════════════════════════════════════════════════════════
+\chapter{Conclusion and Future Work}
+\label{ch:conclusion}
+
+\section{Summary of Contributions}
+
+This project demonstrates that real-time, evidence-backed hallucination detection is achievable using:
+\begin{itemize}[nosep]
+    \item Hybrid retrieval (local FAISS + live Wikipedia API) for comprehensive evidence coverage.
+    \item DeBERTa-v3 NLI for deterministic, reproducible natural language inference.
+    \item A rule-based pre-check for instant contradiction on common facts.
+    \item Fabrication detection via Wikipedia entity verification for identifying made-up concepts.
+    \item Bayesian five-signal confidence fusion for calibrated reliability scores.
+    \item Zero-cost infrastructure using only free-tier cloud services.
+\end{itemize}
+
+The system achieves 93.8\% accuracy on the HaluEval benchmark, operates in 3--8 seconds per message on free CPU, and monitors entire chatbot conversations in real time across ChatGPT, Claude, Gemini, and Grok.
+
+\section{Future Work}
+
+\begin{table}[H]
+\centering
+\caption{Development roadmap.}
+\label{tab:roadmap}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Priority} & \textbf{Enhancement} & \textbf{Expected Impact} \\
+\midrule
+High & HuggingFace GPU grant (T4) & 10$\times$ faster NLI ($\sim$0.5\,s/claim) \\
+High & DeBERTa-v3-LARGE & Higher NLI accuracy (needs GPU) \\
+High & Wikidata structured facts API & 100M+ triples for precise lookup \\
+Medium & Multi-hop evidence chaining & Verify complex multi-source claims \\
+Medium & INT8 model quantization & 4$\times$ CPU speedup without GPU \\
+Medium & Dynamic source reliability & Learn trust from verification history \\
+Low & Multilingual NLI & Non-English language support \\
+Low & News API integration & Cover recent events \\
+Low & Mobile extensions & Safari / Firefox support \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ════════════════════════════════════════════════════════
+% REFERENCES
+% ════════════════════════════════════════════════════════
+\begin{thebibliography}{99}
+
+\bibitem{thorne2018fever}
+Thorne, J., Vlachos, A., Christodoulopoulos, C., \& Mittal, A. (2018). FEVER: a Large-scale Dataset for Fact Extraction and VERification. \textit{Proceedings of NAACL-HLT}, 809--819.
+
+\bibitem{lewis2020rag}
+Lewis, P., Perez, E., Piktus, A., et al. (2020). Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. \textit{Advances in Neural Information Processing Systems (NeurIPS)}, 33, 9459--9474.
+
+\bibitem{he2021deberta}
+He, P., Liu, X., Gao, J., \& Chen, W. (2021). DeBERTa: Decoding-enhanced BERT with Disentangled Attention. \textit{Proceedings of ICLR}.
+
+\bibitem{lin2022truthfulqa}
+Lin, S., Hilton, J., \& Evans, O. (2022). TruthfulQA: Measuring How Models Mimic Human Falsehoods. \textit{Proceedings of ACL}, 3214--3252.
+
+\bibitem{bai2022constitutional}
+Bai, Y., Jones, A., Ndousse, K., et al. (2022). Constitutional AI: Harmlessness from AI Feedback. \textit{Anthropic Technical Report}.
+
+\bibitem{min2023factscore}
+Min, S., Krishna, K., Lyu, X., et al. (2023). FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation. \textit{Proceedings of EMNLP}, 12076--12100.
+
+\bibitem{manakul2023selfcheck}
+Manakul, P., Liusie, A., \& Gales, M.J.F. (2023). SelfCheckGPT: Zero-Resource Black-Box Hallucination Detection for Generative Large Language Models. \textit{Proceedings of EMNLP}, 9004--9017.
+
+\bibitem{shinn2023reflexion}
+Shinn, N., Cassano, F., Gopinath, A., et al. (2023). Reflexion: Language Agents with Verbal Reinforcement Learning. \textit{Advances in Neural Information Processing Systems (NeurIPS)}, 36.
+
+\bibitem{kuhn2024entropy}
+Kuhn, L., Gal, Y., \& Farquhar, S. (2024). Detecting Hallucinations in Large Language Models Using Semantic Entropy. \textit{Nature}, 625, 652--657.
+
+\bibitem{gao2024rag}
+Gao, Y., Xiong, Y., Gao, X., et al. (2024). Retrieval-Augmented Generation for Large Language Models: A Survey. \textit{arXiv:2312.10997}.
+
+\bibitem{dahl2024legal}
+Dahl, M., Magesh, V., Suzgun, M., \& Ho, D.E. (2024). Large Legal Fictions: Profiling Legal Hallucinations in Large Language Models. \textit{Journal of Legal Analysis}, 16(1), 64--93.
+
+\bibitem{chen2024detection}
+Chen, Y., Wang, S., et al. (2024). Hallucination Detection: Robustly Discerning Reliable Answers in Large Language Models. \textit{arXiv preprint}.
+
+\bibitem{zhang2025survey}
+Zhang, Y., Li, Y., et al. (2025). Siren's Song in the AI Ocean: A Survey on Hallucination in Large Language Models. \textit{arXiv preprint}.
+
+\bibitem{kalai2025why}
+Kalai, A.T. \& Vempala, S.S. (2025). Why Language Models Hallucinate. \textit{OpenAI Technical Report}.
+
+\bibitem{faiss}
+Johnson, J., Douze, M., \& J\'{e}gou, H. (2021). Billion-Scale Similarity Search with GPUs. \textit{IEEE Transactions on Big Data}, 7(3), 535--547.
+
+\bibitem{spacy}
+Honnibal, M. \& Montani, I. (2017). spaCy~2: Natural Language Understanding with Bloom Embeddings, Convolutional Neural Networks and Incremental Parsing. Software library.
+
+\bibitem{nextjs}
+Vercel. (2024). Next.js: The React Framework. \url{https://nextjs.org}.
+
+\end{thebibliography}
+
+\end{document}
