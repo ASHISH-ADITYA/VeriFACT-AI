@@ -1,397 +1,388 @@
-# VeriFACT AI — All Architecture & Flow Diagrams (Mermaid Code)
+# VeriFACT AI — Architecture Diagrams (Verified Against Source Code)
 
-> Paste each code block into https://mermaid.live to render
+> Every arrow and connection verified against actual Python source.
+> Optimized for Claude Opus rendering. Paste into claude.ai for diagrams.
 
 ---
 
-## 1. System Architecture (High-Level)
+## 1. System Architecture
 
 ```mermaid
 graph TB
-    subgraph CLIENT["Client Layer"]
-        EXT["Chrome Extension<br/>(Manifest V3)<br/>ChatGPT | Claude | Gemini | Grok"]
-        WEB["Web Dashboard<br/>(Next.js 15.5.15)<br/>Vercel"]
-        STR["Streamlit Dashboard<br/>(app.py:8501)"]
+    subgraph CLIENTS["Client Layer"]
+        direction LR
+        EXT["Chrome Extension\n(content.js)\nChatGPT · Claude · Gemini · Grok"]
+        WEB["Web Dashboard\n(Next.js 15.5.15)\nVercel"]
+        STREAM["Streamlit\n(app.py)"]
     end
 
-    subgraph API["API Layer (overlay_server.py)"]
-        AF["/analyze/fast<br/>(3-8s)"]
-        AN["/analyze<br/>(10-15s)"]
-        AS["/analyze/stream<br/>(SSE)"]
-        OP["/optimize<br/>(<1s)"]
-        HE["/health"]
+    subgraph SERVER["API Server (overlay_server.py, port 7860)"]
+        direction LR
+        FAST["POST /analyze/fast"]
+        FULL["POST /analyze"]
+        SSE["POST /analyze/stream"]
+        OPT["POST /optimize"]
+        HEALTH["GET /health"]
     end
 
-    subgraph PIPE["Pipeline Layer (pipeline.py)"]
-        CD["Stage 1<br/>Claim Decomposer"]
-        RE["Stage 2a<br/>Rule Engine<br/>(400+ facts)"]
-        ER["Stage 2b<br/>Evidence Retriever"]
-        VE["Stage 3<br/>Verdict Engine<br/>(DeBERTa NLI)"]
-        SC["Stage 4<br/>SelfCheck"]
-        CF["Stage 5<br/>Confidence Fusion"]
-        AO["Stage 6<br/>Annotator"]
+    subgraph PIPELINE["VeriFactPipeline (pipeline.py)"]
+        direction TB
+        S1["Stage 1: ClaimDecomposer\n(claim_decomposer.py)"]
+        S2A["Stage 2a: RuleEngine\n(fact_rules.py)\n400+ facts, 9 rule types"]
+        S2B["Stage 2b: EvidenceRetriever\n(evidence_retriever.py)"]
+        S3["Stage 3: VerdictEngine\n(verdict_engine.py)\nDeBERTa-v3 NLI"]
+        S4["Stage 4: SelfCheck\n(selfcheck.py)"]
+        S5["Stage 5: ConfidenceFusion\n(verdict_engine._bayesian_confidence)"]
+        S6["Stage 6: Annotator\n(annotator.py)\nReflexion + Constitutional"]
     end
 
-    subgraph DATA["Data & Knowledge Layer"]
-        FAISS[("FAISS Index<br/>IndexFlatIP<br/>11K vectors<br/>384-dim")]
-        BM25[("BM25 Index<br/>rank_bm25<br/>In-memory")]
-        WIKI[("Wikipedia API<br/>6.8M articles<br/>Full-text search")]
-        RULES[("Rule Database<br/>400+ facts<br/>9 rule types")]
-        META[("Metadata JSONL<br/>text | source<br/>title | url")]
+    subgraph KNOWLEDGE["Knowledge Layer"]
+        direction LR
+        FAISS[("FAISS IndexFlatIP\n11K vectors, 384-dim\n(pre-built in Docker)")]
+        BM25[("BM25 (rank_bm25)\nIn-memory sparse index")]
+        WIKI_API[("Wikipedia API\n6.8M articles\nFull-text paragraph search")]
+        RULES_DB[("Rule Database\n400+ hardcoded facts")]
+        METADATA[("chunks.jsonl\ntext · source · title · url")]
     end
 
-    subgraph MODELS["ML Models"]
-        DEBERTA["DeBERTa-v3-base<br/>NLI (435MB)"]
-        MINILM["all-MiniLM-L6-v2<br/>Embeddings (83MB)"]
-        RERANK["ms-marco-MiniLM<br/>Reranker (128MB)"]
-        SPACY["spaCy en_core_web_sm<br/>Fallback (43MB)"]
+    subgraph MODELS["ML Models (pre-downloaded)"]
+        direction LR
+        DEBERTA["DeBERTa-v3-base\n(NLI, 435MB)"]
+        MINILM["all-MiniLM-L6-v2\n(Embeddings, 83MB, 384-dim)"]
+        RERANKER["ms-marco-MiniLM-L-6-v2\n(Reranker, 128MB)"]
+        SPACY_M["spaCy en_core_web_sm\n(Fallback NLP, 43MB)"]
+        TOXIC["unitary/toxic-bert\n(Risk classifier, optional)"]
     end
 
-    subgraph EXTERNAL["External Services (Free)"]
-        GROQ["Groq API<br/>Llama 3.1 8B<br/>30 req/min free"]
-        OLLAMA["Ollama<br/>Local LLM<br/>(optional)"]
+    subgraph EXTERNAL["External APIs (Free)"]
+        direction LR
+        GROQ["Groq API\nllama-3.1-8b-instant\n30 req/min free"]
+        OLLAMA["Ollama\nllama3.1:8b\nlocalhost:11434"]
     end
 
-    EXT -->|"POST /analyze/fast"| AF
-    WEB -->|"POST /analyze"| AN
-    STR -->|"Direct Python"| PIPE
+    EXT -->|"POST /analyze/fast\n(default for extension)"| FAST
+    WEB -->|"POST /analyze"| FULL
+    STREAM -->|"Direct Python call"| S1
 
-    AF --> PIPE
-    AN --> PIPE
-    AS --> PIPE
-    OP --> PIPE
+    FAST --> S1
+    FULL --> S1
+    SSE --> S1
 
-    CD -->|"claims[]"| RE
-    RE -->|"unresolved"| ER
-    ER -->|"evidence[]"| VE
-    VE -->|"verdicts[]"| SC
-    SC -->|"uncertainty"| CF
-    CF -->|"confidence"| AO
+    S1 -->|"claims[] (max 8 fast, 20 full)"| S2A
+    S2A -->|"rule_resolved[] instantly"| S6
+    S2A -->|"unresolved[] claims"| S2B
+    S2B -->|"evidence[][] (top-5 per claim)"| S3
+    S3 -->|"verdicts[]"| S4
+    S4 -->|"uncertainty metrics"| S5
+    S5 -->|"confidence scores"| S6
+    S6 -->|"JSON + HTML response"| SERVER
 
-    ER --- FAISS
-    ER --- BM25
-    ER --- WIKI
-    ER --- META
-    RE --- RULES
-    VE --- DEBERTA
-    ER --- MINILM
-    ER --- RERANK
-    CD --- GROQ
-    CD --- OLLAMA
-    CD --- SPACY
+    S1 -.->|"LLM call\n(claim extraction)"| GROQ
+    S1 -.->|"LLM call\n(if Groq fails)"| OLLAMA
+    S1 -.->|"Fallback\n(if no LLM)"| SPACY_M
 
-    style CLIENT fill:#e3f2fd,stroke:#1565c0
-    style API fill:#f3e5f5,stroke:#7b1fa2
-    style PIPE fill:#e8f5e9,stroke:#2e7d32
-    style DATA fill:#fff3e0,stroke:#e65100
-    style MODELS fill:#fce4ec,stroke:#c62828
-    style EXTERNAL fill:#f1f8e9,stroke:#558b2f
+    S2B -->|"Batch encode queries"| MINILM
+    S2B -->|"Vector search"| FAISS
+    S2B -->|"Keyword search"| BM25
+    S2B -->|"Rerank candidates"| RERANKER
+    S2B -->|"Live search\n(EVERY claim)"| WIKI_API
+    S2B -->|"Load chunk text"| METADATA
+    S2A -->|"Lookup"| RULES_DB
+
+    S3 -->|"Batch NLI\n(single forward pass)"| DEBERTA
+
+    style CLIENTS fill:#E3F2FD
+    style SERVER fill:#F3E5F5
+    style PIPELINE fill:#E8F5E9
+    style KNOWLEDGE fill:#FFF3E0
+    style MODELS fill:#FCE4EC
+    style EXTERNAL fill:#F1F8E9
 ```
 
 ---
 
-## 2. Pipeline Data Flow (Request → Response)
+## 2. Complete Request-Response Flow
 
 ```mermaid
 sequenceDiagram
-    participant U as User/Extension
-    participant S as API Server
-    participant D as Claim Decomposer
-    participant R as Rule Engine
-    participant E as Evidence Retriever
-    participant W as Wikipedia API
-    participant N as DeBERTa NLI
-    participant C as Confidence Fusion
-    participant A as Annotator
+    participant User as User / Extension
+    participant API as overlay_server.py
+    participant CD as ClaimDecomposer
+    participant LLM as Groq / Ollama / spaCy
+    participant Rules as fact_rules.py (400+)
+    participant ER as EvidenceRetriever
+    participant FAISS as FAISS (11K local)
+    participant BM25 as BM25 (sparse)
+    participant WIKI as Wikipedia API (6.8M)
+    participant NLI as DeBERTa-v3 NLI
+    participant SC as SelfCheck
+    participant CF as Confidence Fusion
+    participant AN as Annotator
 
-    U->>S: POST /analyze/fast {text: "..."}
-    S->>S: CORS check + Rate limit + Auth
+    User->>API: POST /analyze/fast {text, top_claims:8}
+    API->>API: Validate: CORS + rate limit (20/min) + auth + size (50K max)
 
-    S->>D: decompose(text)
-    alt LLM available (Groq/Ollama)
-        D->>D: LLM JSON extraction
-    else No LLM
-        D->>D: spaCy sentence split + fact-density ranking
-    end
-    D-->>S: claims[] (max 8 for fast, 20 for full)
+    Note over API,CD: STAGE 1: Claim Decomposition
+    API->>CD: decompose(text)
+    CD->>LLM: Generate JSON claims (or spaCy fallback)
+    LLM-->>CD: Raw JSON / sentences
+    CD->>CD: Parse + filter non-factual + fact-density rank
+    CD-->>API: claims[] (capped at 8 for fast)
 
-    loop For each claim
-        S->>R: check_rules(claim)
-        alt Rule matches (geography/date/science)
-            R-->>S: CONTRADICTED (95% confidence, <1ms)
-        else No rule match
-            R-->>S: null (proceed to NLI)
+    Note over API,Rules: STAGE 2a: Rule Check (instant)
+    loop Each claim
+        API->>Rules: check_rules(claim.text)
+        alt Rule matches (landmark/capital/date/science/person)
+            Rules-->>API: RuleViolation → CONTRADICTED (0.95 conf)
+        else No rule
+            Rules-->>API: None → needs NLI
         end
     end
 
-    S->>E: batch_retrieve(unresolved_claims)
-    E->>E: Batch encode (MiniLM-L6, single call)
-    E->>E: FAISS search (11K vectors)
-    E->>E: BM25 search (keyword matching)
-    E->>E: RRF fusion (k=60)
-    E->>E: Cross-encoder rerank
+    Note over API,WIKI: STAGE 2b: Evidence Retrieval (unresolved only)
+    API->>ER: batch_retrieve(unresolved_claims)
+    ER->>ER: _expand_queries() → original + negation query
+    ER->>FAISS: Batch encode (MiniLM, single call) + search
+    FAISS-->>ER: Dense results (top-15 per claim)
+    ER->>BM25: Keyword search per claim
+    BM25-->>ER: Sparse results (top-15 per claim)
+    ER->>ER: RRF fusion (k=60) + deduplicate
+    ER->>ER: Cross-encoder rerank (single predict call)
 
-    loop For each claim
-        E->>W: Wikipedia API search (6.8M articles)
-        W-->>E: Full article text + paragraph scoring
+    loop Each claim (ALWAYS, not fallback)
+        ER->>WIKI: Search 6.8M articles + get full text
+        WIKI-->>ER: Best 2 paragraphs (800 chars) + computed similarity
     end
-    E-->>S: evidence[][] (top-5 per claim)
+    ER->>ER: Merge local + wiki, sort by similarity, top-5
+    ER-->>API: evidence[][] (top-5 per unresolved claim)
 
-    S->>N: batch_judge(claims + evidence)
-    N->>N: Single tokenize + forward pass (all pairs)
-    N->>N: Fabrication check (no wiki = fake?)
-    N->>N: Specificity gate (entailment × similarity)
-    N-->>S: verdicts[] (SUPPORTED/CONTRADICTED/UNVERIFIABLE)
+    Note over API,NLI: STAGE 3: NLI Verdict (batched)
+    API->>NLI: batch_judge(claims + evidence)
+    NLI->>NLI: Collect ALL (evidence, claim) pairs
+    NLI->>NLI: Single tokenize + single forward pass
+    NLI->>NLI: Check: has_wiki_evidence? fabrication? hard_contradiction?
+    NLI->>NLI: Decision: FABRICATED → CONTRADICTED → SUPPORTED → UNVERIFIABLE
+    NLI-->>API: verdicts[] with labels + confidence
 
-    S->>C: bayesian_confidence()
-    Note over C: 5 signals: NLI(0.32) + Retrieval(0.22)<br/>+ Source(0.12) + CrossRef(0.16) + Uncertainty(0.18)
-    C-->>S: confidence scores[]
+    Note over API,SC: STAGE 4: SelfCheck (skipped in fast mode)
+    opt Full mode only
+        API->>SC: score_claim(claim, evidence)
+        SC-->>API: consistency + entropy + uncertainty
+    end
 
-    S->>A: generate_json(text, claims)
-    A-->>S: {factuality_score, flags[], alerts[]}
+    Note over API,CF: STAGE 5: Confidence Fusion
+    API->>CF: _bayesian_confidence(5 signals)
+    Note over CF: NLI(0.32) + Retrieval(0.22) + Source(0.12) + CrossRef(0.16) + Uncertainty(0.18)
+    CF-->>API: final confidence [0,1]
 
-    S-->>U: JSON response
-    Note over U: Extension: highlight red/yellow<br/>Dashboard: show verdict cards
+    Note over API,AN: STAGE 6: Annotation
+    API->>AN: generate_json(text, claims)
+    AN-->>API: {factuality_score, flags[], alerts[]}
+
+    API-->>User: JSON response
+    Note over User: Extension: red/yellow highlights + dashboard update
 ```
 
 ---
 
-## 3. Evidence Retrieval Pipeline (Hybrid Search)
+## 3. Evidence Retrieval Detail
 
 ```mermaid
-graph LR
-    CLAIM["Claim Text<br/>'Napoleon lost Waterloo in 1815'"]
+graph TD
+    CLAIM["Input: claim text"]
 
-    subgraph EXPAND["Query Expansion"]
-        Q1["Original query"]
-        Q2["Negation query<br/>(content words + 'facts location history')"]
+    EXPAND["_expand_queries()\n1. Original claim\n2. Content words + 'facts location history'"]
+
+    subgraph LOCAL["Local Index Search"]
+        ENCODE["Batch encode\n(MiniLM-L6-v2, 384-dim)"]
+        FSEARCH["FAISS IndexFlatIP\nsearch(embeddings, k=15)"]
+        BSEARCH["BM25Okapi\nget_top_n(tokenized, k=15)"]
+        RRF["Reciprocal Rank Fusion\nscore = 1/(60+rank_dense)\n      + 1/(60+rank_sparse)"]
+        DEDUP["Deduplicate by chunk_id"]
+        RERANK["Cross-encoder rerank\n(ms-marco-MiniLM-L-6-v2)\nSigmoid normalize scores"]
+        LOCAL_TOP["Local top-5"]
     end
 
-    subgraph DENSE["Dense Retrieval"]
-        ENC["Encode<br/>(MiniLM-L6-v2<br/>384-dim)"]
-        FAISS["FAISS IndexFlatIP<br/>search(query, k=15)"]
-        DR["Dense Results<br/>(15 candidates)"]
+    subgraph LIVE["Wikipedia API Search (EVERY claim)"]
+        WSEARCH["en.wikipedia.org/w/api.php\n?action=query&list=search\n&srsearch={claim}"]
+        WFULL["Get FULL article text\n(not just intro)"]
+        WPARA["Split into paragraphs\nScore each by query-term overlap"]
+        WBEST["Best 2 paragraphs\n(up to 800 chars)\nComputed similarity = term_overlap × 0.85"]
     end
 
-    subgraph SPARSE["Sparse Retrieval"]
-        TOK["Tokenize<br/>(lowercase, split)"]
-        BM25["BM25Okapi<br/>score(query)"]
-        SR["Sparse Results<br/>(15 candidates)"]
-    end
+    MERGE["Merge local + wiki results\nDeduplicate by title\nSort by similarity desc\nKeep top-5"]
 
-    subgraph FUSION["Reciprocal Rank Fusion"]
-        RRF["RRF Score =<br/>1/(60+rank_dense) +<br/>1/(60+rank_sparse)"]
-        DEDUP["Deduplicate<br/>by chunk_id"]
-        FUSED["Fused Candidates<br/>(15 unique)"]
-    end
-
-    subgraph RERANK["Cross-Encoder Reranking"]
-        CE["ms-marco-MiniLM-L-6<br/>predict(query, passage)"]
-        SIG["Sigmoid normalization"]
-        TOP["Top-5 reranked"]
-    end
-
-    subgraph WIKIAPI["Wikipedia API (6.8M articles)"]
-        SEARCH["Search API<br/>srsearch=query"]
-        FULL["Get full article text"]
-        PARA["Score paragraphs by<br/>query term overlap"]
-        BEST["Best 2 paragraphs<br/>(800 chars)"]
-    end
-
-    subgraph MERGE["Final Evidence"]
-        MRG["Merge local + wiki<br/>Deduplicate by title<br/>Sort by similarity"]
-        FINAL["Top-5 Evidence<br/>with source + URL"]
-    end
+    OUTPUT["Output: list[Evidence]\ntext · source · title · url · similarity"]
 
     CLAIM --> EXPAND
-    Q1 --> ENC
-    Q2 --> ENC
-    ENC --> FAISS
-    FAISS --> DR
-
-    Q1 --> TOK
-    TOK --> BM25
-    BM25 --> SR
-
-    DR --> RRF
-    SR --> RRF
+    EXPAND --> ENCODE
+    ENCODE --> FSEARCH
+    EXPAND --> BSEARCH
+    FSEARCH --> RRF
+    BSEARCH --> RRF
     RRF --> DEDUP
-    DEDUP --> FUSED
-    FUSED --> CE
-    CE --> SIG
-    SIG --> TOP
+    DEDUP --> RERANK
+    RERANK --> LOCAL_TOP
 
-    CLAIM --> SEARCH
-    SEARCH --> FULL
-    FULL --> PARA
-    PARA --> BEST
+    CLAIM --> WSEARCH
+    WSEARCH --> WFULL
+    WFULL --> WPARA
+    WPARA --> WBEST
 
-    TOP --> MRG
-    BEST --> MRG
-    MRG --> FINAL
+    LOCAL_TOP --> MERGE
+    WBEST --> MERGE
+    MERGE --> OUTPUT
 
-    style DENSE fill:#bbdefb,stroke:#1565c0
-    style SPARSE fill:#ffe0b2,stroke:#e65100
-    style FUSION fill:#c8e6c9,stroke:#2e7d32
-    style RERANK fill:#f8bbd0,stroke:#c62828
-    style WIKIAPI fill:#e1bee7,stroke:#7b1fa2
-    style MERGE fill:#fff9c4,stroke:#f57f17
+    style LOCAL fill:#BBDEFB
+    style LIVE fill:#E1BEE7
 ```
 
 ---
 
-## 4. Verdict Engine Decision Tree
+## 4. Verdict Decision Tree (Exact Code Logic)
 
 ```mermaid
 graph TD
-    START["Claim + Evidence<br/>(from retriever)"]
+    INPUT["claim + evidence\n+ nli_results"]
 
-    RULE{"Rule Engine<br/>check_rules()"}
-    RULE_YES["CONTRADICTED<br/>confidence: 0.95<br/>source: factual_rule"]
+    RULE{"fact_rules.check_rules()\nLandmark? Capital? Date?\nScience? Person?"}
+    RULE_HIT["CONTRADICTED\nconfidence=0.95\nsource=factual_rule\n(skip all NLI)"]
 
-    NLI["DeBERTa NLI<br/>batch_nli()"]
-    SCORES["max_contradiction<br/>max_entailment<br/>max_similarity"]
+    NLI_CALC["Compute:\nmax_con, max_raw_ent\nmax_specific_ent\nmax_similarity\nbest_wiki_sim\nhas_wiki_evidence"]
 
-    WIKI_CHECK{"Wikipedia API<br/>returned evidence?"}
-    WIKI_SIM{"Wiki similarity<br/>> 0.45?"}
+    FAB{"FABRICATION?\nhas_specific_entity OR has_technical_term\nAND NOT has_wiki_evidence\nAND evidence_is_irrelevant\nAND max_raw_ent < 0.40"}
+    FAB_YES["CONTRADICTED\nconfidence ≥ 0.80\nreason: fabricated"]
 
-    FAB{"Fabrication Check<br/>Specific entity + No wiki?"}
-    FAB_YES["CONTRADICTED<br/>confidence: 0.80+<br/>reason: fabricated"]
+    HARD{"HARD CONTRADICTION?\nmax_con > 0.80\nAND max_con > max_raw_ent + 0.20\nAND best_contra.sim > 0.50"}
 
-    HARD{"Hard Contradiction<br/>NLI contra > 0.80<br/>AND contra > ent + 0.20<br/>AND sim > 0.50?"}
-    HARD_YES["CONTRADICTED<br/>confidence: NLI-based"]
+    WIKI_OVERRIDE{"wiki_confirms?\nbest_wiki_sim > 0.45"}
+    WIKI_WIN["SUPPORTED\nreason: Wikipedia confirms"]
+    HARD_WIN["CONTRADICTED\nNLI-based"]
 
-    WIKI_TRUST{"Wikipedia confirms<br/>topic exists?"}
-    WIKI_SUP["SUPPORTED<br/>reason: Wikipedia confirms"]
+    STRONG{"strong_support?\nmax_specific_ent > 0.65"}
+    MOD{"moderate_support?\nmax_raw_ent > 0.35\nAND max_similarity > 0.30"}
+    WIKI_OR_STRONG{"wiki_confirms OR\nstrong OR moderate?"}
 
-    STRONG{"Strong Support<br/>specific_ent > 0.65?"}
-    MOD{"Moderate Support<br/>raw_ent > 0.35<br/>AND sim > 0.30?"}
-    WEAK{"Weak Support<br/>sim > 0.25<br/>AND contra < 0.60?"}
+    WEAK{"weak_support?\nmax_similarity > 0.25\nAND max_con < 0.60"}
 
-    SUP["SUPPORTED"]
-    UNVER["UNVERIFIABLE"]
+    IRREL_ENT{"evidence_is_irrelevant\nAND has_specific_entity\nAND NOT has_wiki_evidence?"}
 
-    START --> RULE
-    RULE -->|"Match"| RULE_YES
-    RULE -->|"No match"| NLI
-    NLI --> SCORES
-    SCORES --> FAB
+    IRREL{"evidence_is_irrelevant?\nmax_sim < 0.35\nAND avg_sim < 0.25"}
+
+    SUPPORTED["SUPPORTED"]
+    CONTRADICTED_IRREL["CONTRADICTED\n(specific + no evidence)"]
+    UNVERIFIABLE["UNVERIFIABLE\n(generic + no evidence)"]
+    SUPPORTED_DEFAULT["SUPPORTED\n(default)"]
+
+    INPUT --> RULE
+    RULE -->|"Match"| RULE_HIT
+    RULE -->|"No match"| NLI_CALC
+    NLI_CALC --> FAB
     FAB -->|"Yes"| FAB_YES
     FAB -->|"No"| HARD
-    HARD -->|"Yes"| WIKI_TRUST
-    WIKI_TRUST -->|"Yes"| WIKI_SUP
-    WIKI_TRUST -->|"No"| HARD_YES
-    HARD -->|"No"| STRONG
-    STRONG -->|"Yes"| SUP
-    STRONG -->|"No"| MOD
-    MOD -->|"Yes"| SUP
-    MOD -->|"No"| WEAK
-    WEAK -->|"Yes"| SUP
-    WEAK -->|"No"| UNVER
+    HARD -->|"Yes"| WIKI_OVERRIDE
+    WIKI_OVERRIDE -->|"Yes"| WIKI_WIN
+    WIKI_OVERRIDE -->|"No"| HARD_WIN
+    HARD -->|"No"| WIKI_OR_STRONG
+    WIKI_OR_STRONG -->|"Yes"| SUPPORTED
+    WIKI_OR_STRONG -->|"No"| WEAK
+    WEAK -->|"Yes"| SUPPORTED
+    WEAK -->|"No"| IRREL_ENT
+    IRREL_ENT -->|"Yes"| CONTRADICTED_IRREL
+    IRREL_ENT -->|"No"| IRREL
+    IRREL -->|"Yes"| UNVERIFIABLE
+    IRREL -->|"No"| SUPPORTED_DEFAULT
 
-    style RULE_YES fill:#ffcdd2,stroke:#c62828
-    style FAB_YES fill:#ffcdd2,stroke:#c62828
-    style HARD_YES fill:#ffcdd2,stroke:#c62828
-    style SUP fill:#c8e6c9,stroke:#2e7d32
-    style WIKI_SUP fill:#c8e6c9,stroke:#2e7d32
-    style UNVER fill:#fff9c4,stroke:#f57f17
+    style RULE_HIT fill:#FFCDD2
+    style FAB_YES fill:#FFCDD2
+    style HARD_WIN fill:#FFCDD2
+    style CONTRADICTED_IRREL fill:#FFCDD2
+    style SUPPORTED fill:#C8E6C9
+    style WIKI_WIN fill:#C8E6C9
+    style SUPPORTED_DEFAULT fill:#C8E6C9
+    style UNVERIFIABLE fill:#FFF9C4
 ```
 
 ---
 
-## 5. Bayesian Confidence Fusion
+## 5. Bayesian Confidence Fusion (5 Signals)
 
 ```mermaid
 graph LR
-    subgraph SIGNALS["5 Input Signals"]
-        S1["NLI Score<br/>(max_ent - max_con + 1) / 2<br/>weight: 0.32"]
-        S2["Retrieval Similarity<br/>max(evidence.similarity)<br/>weight: 0.22"]
-        S3["Source Reliability<br/>wikipedia: 1.0<br/>pubmed: 1.0<br/>unknown: 0.5<br/>weight: 0.12"]
-        S4["Cross-Reference<br/>fraction(ent > con)<br/>weight: 0.16"]
-        S5["Uncertainty Stability<br/>1 - entropy(NLI dist)<br/>weight: 0.18"]
-    end
+    S1["Signal 1: NLI\n(max_ent - max_con + 1) / 2\nRange: [0, 1]\nWeight: 0.32"]
+    S2["Signal 2: Retrieval\nmax(evidence.similarity)\nRange: [0, 1]\nWeight: 0.22"]
+    S3["Signal 3: Source\nmean(source_reliability)\nwikipedia=1.0, pubmed=1.0\nunknown=0.5\nWeight: 0.12"]
+    S4["Signal 4: Cross-Ref\nfraction where\nentailment > contradiction\nAND entailment > 0.5\nWeight: 0.16"]
+    S5["Signal 5: Stability\n1 - uncertainty\nuncertainty = 0.65×entropy\n+ 0.35×disagreement\nWeight: 0.18"]
 
-    FUSE["Weighted Fusion<br/>Σ(w_i × signal_i)<br/>σ(result) → [0, 1]"]
+    FUSION["confidence = σ(\nΣ w_i × signal_i\n)"]
 
-    THRESH{"Threshold"}
-    HIGH["Verified<br/>confidence ≥ 0.75"]
-    MED["Uncertain<br/>0.40 ≤ conf < 0.75"]
-    LOW["Hallucination<br/>confidence < 0.50"]
+    S1 --> FUSION
+    S2 --> FUSION
+    S3 --> FUSION
+    S4 --> FUSION
+    S5 --> FUSION
 
-    S1 --> FUSE
-    S2 --> FUSE
-    S3 --> FUSE
-    S4 --> FUSE
-    S5 --> FUSE
+    BOOST{"is_likely_fabricated?"}
+    BOOST_YES["confidence = max(conf, 0.80)"]
 
-    FUSE --> THRESH
-    THRESH -->|"≥ 0.75"| HIGH
-    THRESH -->|"0.40-0.75"| MED
-    THRESH -->|"< 0.50"| LOW
+    FUSION --> BOOST
+    BOOST -->|"Yes"| BOOST_YES
+    BOOST -->|"No"| FINAL
 
-    style HIGH fill:#c8e6c9,stroke:#2e7d32
-    style MED fill:#fff9c4,stroke:#f57f17
-    style LOW fill:#ffcdd2,stroke:#c62828
+    FINAL["Final confidence\n[0.0 - 1.0]"]
+
+    style FUSION fill:#B2DFDB
+    style BOOST_YES fill:#FFCDD2
 ```
 
 ---
 
-## 6. SelfCheck Consistency Scoring
+## 6. SelfCheck (Two Paths)
 
 ```mermaid
 graph TD
-    CLAIM["Claim + Evidence"]
+    INPUT["Input: claim_text + evidence[]"]
 
-    subgraph LLM_PATH["LLM Path (if available)"]
-        S1["Sample 1<br/>temp=0.10"]
-        S2["Sample 2<br/>temp=0.25"]
-        S3["Sample 3<br/>temp=0.40"]
-        S4["Sample 4<br/>temp=0.55"]
-        S5["Sample 5<br/>temp=0.70"]
-        LABELS["Labels:<br/>supported | contradicted | uncertain"]
+    CHECK{"LLM available?\n(provider ≠ 'none')"}
+
+    subgraph LLM_PATH["LLM Sampling Path"]
+        SAMPLE["5 LLM calls at temps:\n0.10, 0.25, 0.40, 0.55, 0.70"]
+        PARSE["Parse JSON response:\n{label, rationale}"]
+        LABELS_LLM["Labels: supported | contradicted | uncertain"]
     end
 
-    subgraph NLI_PATH["NLI Fallback (no LLM)"]
-        E1["Evidence 1 × Claim → NLI"]
-        E2["Evidence 2 × Claim → NLI"]
-        E3["Evidence 3 × Claim → NLI"]
-        NLILABELS["Map: max(ent)→supported<br/>max(con)→contradicted<br/>else→uncertain"]
+    subgraph NLI_PATH["NLI Fallback Path (no LLM)"]
+        NLI_RUN["Run _batch_nli(claim, evidence)\nvia shared VerdictEngine"]
+        MAP["Map NLI scores:\nmax(ent) → supported\nmax(con) → contradicted\nelse → uncertain"]
+        LABELS_NLI["Same label format"]
     end
 
-    subgraph METRICS["Uncertainty Metrics"]
-        ENT["Normalized Entropy<br/>H(p_sup, p_con, p_unc) / log(3)"]
-        DIS["Disagreement Ratio<br/>1 - (max_count / total)"]
-        SEM["Semantic Cluster Entropy<br/>Jaccard clustering (thresh=0.5)"]
-    end
+    ENTROPY["normalized_entropy(labels, 3 classes)"]
+    DISAGREE["disagreement = 1 - max_count/total"]
+    CLUSTER["cluster_entropy(rationales, jaccard=0.5)\n(LLM path only)"]
 
-    BLEND["Confidence Blend<br/>new = (1-0.2) × NLI_conf + 0.2 × consistency"]
+    UNCERTAINTY["uncertainty =\n0.65 × entropy\n+ 0.35 × disagreement\n+ 0.30 × cluster_entropy"]
 
-    CLAIM --> LLM_PATH
-    CLAIM --> NLI_PATH
+    BLEND["Blend with NLI confidence:\nnew_conf = 0.80 × nli_conf\n+ 0.20 × consistency"]
 
-    S1 --> LABELS
-    S2 --> LABELS
-    S3 --> LABELS
-    S4 --> LABELS
-    S5 --> LABELS
+    INPUT --> CHECK
+    CHECK -->|"Yes"| SAMPLE
+    CHECK -->|"No"| NLI_RUN
+    SAMPLE --> PARSE --> LABELS_LLM
+    NLI_RUN --> MAP --> LABELS_NLI
+    LABELS_LLM --> ENTROPY
+    LABELS_LLM --> DISAGREE
+    LABELS_LLM --> CLUSTER
+    LABELS_NLI --> ENTROPY
+    LABELS_NLI --> DISAGREE
+    ENTROPY --> UNCERTAINTY
+    DISAGREE --> UNCERTAINTY
+    CLUSTER --> UNCERTAINTY
+    UNCERTAINTY --> BLEND
 
-    E1 --> NLILABELS
-    E2 --> NLILABELS
-    E3 --> NLILABELS
-
-    LABELS --> ENT
-    LABELS --> DIS
-    LABELS --> SEM
-    NLILABELS --> ENT
-    NLILABELS --> DIS
-
-    ENT --> BLEND
-    DIS --> BLEND
-    SEM --> BLEND
-
-    style LLM_PATH fill:#e1bee7,stroke:#7b1fa2
-    style NLI_PATH fill:#bbdefb,stroke:#1565c0
-    style METRICS fill:#fff3e0,stroke:#e65100
+    style LLM_PATH fill:#E1BEE7
+    style NLI_PATH fill:#BBDEFB
 ```
 
 ---
@@ -400,60 +391,47 @@ graph TD
 
 ```mermaid
 graph TB
-    subgraph BROWSER["Browser (ChatGPT / Claude / Gemini)"]
-        DOM["Chatbot DOM<br/>(assistant messages)"]
-        INPUT["User Input Field"]
+    subgraph CHATBOT["Chatbot Page (ChatGPT / Claude / Gemini)"]
+        DOM["Assistant message DOM nodes"]
+        INPUT_FIELD["User input textarea / contenteditable"]
     end
 
-    subgraph EXTENSION["Chrome Extension (Manifest V3)"]
-        BG["background.js<br/>(service worker)"]
-        CS["content.js<br/>(injected script)"]
-        CSS["styles.css<br/>(3D liquid glass)"]
+    subgraph EXT["Chrome Extension (content.js)"]
+        OBSERVER["MutationObserver\n(watches DOM changes)"]
+        SCANNER["scan() function\n3 messages in parallel\nCache per DOM node"]
+        FILTER["extractFactualText()\nClient-side pre-filter\nRemove questions, meta, filler"]
+        HIGHLIGHT["highlightNode()\nRed = CONTRADICTED\nYellow = UNVERIFIABLE"]
 
-        subgraph BEACON["Beacon (72px glass orb)"]
-            B_IDLE["Idle (blue)"]
-            B_SCAN["Scanning (purple pulse)"]
-            B_SAFE["Safe (green)"]
-            B_ALERT["Alert (red pulse)"]
-        end
-
-        subgraph DASH["Dashboard (glass panel)"]
-            KPI["KPI Row<br/>Score | Claims | Verified | False | Unclear"]
-            CARDS["Claim Cards<br/>verdict + confidence + evidence"]
-            LOGO["VF Logo → Website"]
-        end
-
-        subgraph PROMPT["Prompt Suggestion"]
-            TIP["Suggestion Tooltip<br/>Score + Improvements"]
-            ACCEPT["Accept Suggested"]
-            DISMISS["Use Original"]
-            CLOSE["× Close"]
-        end
+        BEACON["Beacon (72px glass orb)\nDraggable anywhere\nStates: idle/scanning/safe/alert"]
+        DASHBOARD["Dashboard (glass panel)\nDraggable, KPI row\nClaim cards with evidence\nVF logo → website link"]
+        PROMPT_TIP["Prompt Suggestion\nDraggable, X to close\nAccept / Use Original buttons"]
     end
 
-    subgraph BACKEND["HuggingFace Space"]
-        FAST["/analyze/fast"]
-        OPT["/optimize"]
+    subgraph BACKEND["HuggingFace Space API"]
+        ANALYZE["/analyze/fast"]
+        OPTIMIZE["/optimize"]
     end
 
-    DOM -->|"MutationObserver"| CS
-    CS -->|"Extract text"| CS
-    CS -->|"POST (3 parallel)"| FAST
-    FAST -->|"JSON response"| CS
-    CS -->|"Highlight red/yellow"| DOM
-    CS -->|"Update"| BEACON
-    CS -->|"Render"| DASH
+    DOM -->|"MutationObserver\ndetects new messages"| OBSERVER
+    OBSERVER -->|"debounce 1.5s"| SCANNER
+    SCANNER -->|"extract innerText"| FILTER
+    FILTER -->|"POST (up to 3 parallel)"| ANALYZE
+    ANALYZE -->|"JSON: flags[], score"| SCANNER
+    SCANNER -->|"Apply highlights"| HIGHLIGHT
+    HIGHLIGHT -->|"Modify DOM"| DOM
+    SCANNER -->|"Update state"| BEACON
+    SCANNER -->|"Render cards"| DASHBOARD
 
-    INPUT -->|"keyup (3s debounce)"| CS
-    CS -->|"POST"| OPT
-    OPT -->|"suggestion"| PROMPT
+    INPUT_FIELD -->|"keyup event\n3s debounce"| PROMPT_TIP
+    PROMPT_TIP -->|"POST"| OPTIMIZE
+    OPTIMIZE -->|"suggested prompt + score"| PROMPT_TIP
+    PROMPT_TIP -->|"Accept: insert text"| INPUT_FIELD
 
-    ACCEPT -->|"Insert into"| INPUT
-    DISMISS -->|"Hide"| PROMPT
+    BEACON -->|"Click"| DASHBOARD
 
-    style BROWSER fill:#e3f2fd,stroke:#1565c0
-    style EXTENSION fill:#f3e5f5,stroke:#7b1fa2
-    style BACKEND fill:#e8f5e9,stroke:#2e7d32
+    style CHATBOT fill:#E3F2FD
+    style EXT fill:#F3E5F5
+    style BACKEND fill:#E8F5E9
 ```
 
 ---
@@ -462,130 +440,149 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph DEV["Development (Local)"]
-        MAC["MacBook Air M4<br/>16GB RAM"]
-        OLL["Ollama<br/>llama3.1:8b"]
-        LOC_FAISS["Local FAISS<br/>(369K vectors)"]
-    end
-
-    subgraph PROD["Production (Free Tier)"]
-        subgraph HF["HuggingFace Spaces"]
-            DOCKER["Docker Container<br/>Python 3.11-slim"]
-            PRE["Pre-built FAISS Index<br/>(11K vectors, baked in)"]
-            MODELS["Pre-downloaded Models<br/>DeBERTa + MiniLM + Reranker"]
-            SERVER["overlay_server.py<br/>Port 7860"]
-        end
-
-        subgraph VERCEL["Vercel"]
-            NEXTJS["Next.js 15.5.15<br/>Static Export"]
-            ASSETS["Logo + AI logos<br/>Crystal theme"]
-        end
-
-        subgraph FREE_APIS["Free External APIs"]
-            GROQ_API["Groq API<br/>Llama 3.1 8B<br/>30 req/min"]
-            WIKI_API["Wikipedia API<br/>6.8M articles<br/>Unlimited"]
-        end
-    end
-
     subgraph USER["End User"]
-        CHROME["Chrome Browser<br/>+ Extension"]
+        BROWSER["Chrome + Extension"]
     end
 
-    CHROME -->|"HTTPS"| SERVER
-    CHROME -->|"HTTPS"| NEXTJS
-    SERVER -->|"HTTP"| GROQ_API
-    SERVER -->|"HTTP"| WIKI_API
-    DOCKER --- PRE
-    DOCKER --- MODELS
-    DOCKER --- SERVER
+    subgraph PROD["Production (All Free)"]
+        subgraph HF["HuggingFace Spaces (Free CPU)"]
+            DOCKER["Docker: python:3.11-slim"]
+            PREBUILD["Pre-built FAISS index\n(baked into image, 25MB)"]
+            PREMODELS["Pre-downloaded models\n(baked into image, ~700MB)"]
+            API_SERVER["overlay_server.py\nPort 7860"]
+        end
 
-    style DEV fill:#fff3e0,stroke:#e65100
-    style HF fill:#e8f5e9,stroke:#2e7d32
-    style VERCEL fill:#e3f2fd,stroke:#1565c0
-    style FREE_APIS fill:#f1f8e9,stroke:#558b2f
+        subgraph VERCEL["Vercel (Free)"]
+            NEXTJS["Next.js 15.5.15\nStatic export"]
+            LOGOS["AI chatbot logos\nVF logo"]
+        end
+    end
+
+    subgraph FREE_APIS["Free External APIs"]
+        GROQ_SVC["Groq Cloud\nLlama 3.1 8B\n30 req/min, 0 cost"]
+        WIKI_SVC["Wikipedia API\n6.8M articles\nUnlimited, 0 cost"]
+    end
+
+    subgraph LOCAL["Local Development"]
+        MAC["MacBook Air M4\n16GB RAM, MPS"]
+        OLLAMA_SVC["Ollama\nllama3.1:8b"]
+        BIG_INDEX["Full FAISS index\n369K vectors"]
+    end
+
+    BROWSER -->|"HTTPS"| API_SERVER
+    BROWSER -->|"HTTPS"| NEXTJS
+    API_SERVER -->|"HTTPS"| GROQ_SVC
+    API_SERVER -->|"HTTPS"| WIKI_SVC
+
+    DOCKER --- PREBUILD
+    DOCKER --- PREMODELS
+    DOCKER --- API_SERVER
+
+    style HF fill:#E8F5E9
+    style VERCEL fill:#E3F2FD
+    style FREE_APIS fill:#F1F8E9
+    style LOCAL fill:#FFF3E0
 ```
 
 ---
 
-## 9. Rule Engine Coverage
+## 9. Rule Engine (9 Rule Types, Actual Execution Order)
 
 ```mermaid
 graph TD
-    INPUT["Claim Text"]
+    CLAIM["claim_text.lower()"]
 
-    R1{"Rule 1<br/>Landmark Location<br/>(68 entries)"}
-    R2{"Rule 2<br/>Capital-Country<br/>(36 entries)"}
-    R3{"Rule 3<br/>City-Country<br/>(19 entries)"}
-    R4{"Rule 4<br/>Country-Continent<br/>(30 entries)"}
-    R5{"Rule 5<br/>Person Achievement<br/>(30+ entries)"}
-    R6{"Rule 6<br/>Historical Events<br/>(7 events)"}
-    R7{"Rule 7<br/>Person Dates<br/>(9 people)"}
-    R8{"Rule 8<br/>Science Numbers<br/>(5 facts)"}
-    R9{"Rule 9<br/>Science T/F<br/>(8 statements)"}
+    R1{"Rule 1: LANDMARK_LOCATIONS\n68 entries\n'great wall' → China\n'eiffel tower' → France"}
+    R2{"Rule 2: CAPITAL_COUNTRY\n36 entries\n'tokyo' → Japan (requires 'capital' in text)"}
+    R3{"Rule 3: CITY_COUNTRY\n19 entries\n'london' → UK, 'sydney' → Australia"}
+    R4{"Rule 4: COUNTRY_CONTINENT\n30 entries\n'brazil' → South America\n(requires location verb)"}
+    R5{"Rule 5: PERSON_ACHIEVEMENT\n30+ entries\n'einstein' → physics, not airplane\n'newton' → gravity, not telephone"}
+    R6{"Rule 6: HISTORICAL_EVENTS\n7 events with year ranges\nWWII: 1939-1945 (±10yr tolerance)\nMoon landing: 1969"}
+    R7{"Rule 7: PERSON_DATES\n9 people with birth/death years\nEinstein: 1879-1955\nShakespeare: 1564-1616"}
+    R8{"Rule 8: SCIENCE_NUMBERS\n5 facts with tolerances\nWater: 100°C (95-105)\nBones: 206 (200-210)"}
+    R9{"Rule 9: SCIENCE_TRUTHS\n8 boolean facts\n'sun revolves around earth' → False\n'gold is a gas' → False"}
 
-    MATCH["CONTRADICTED<br/>confidence: 0.95<br/>skip NLI"]
-    NONE["No match<br/>→ proceed to NLI"]
+    HIT["Return RuleViolation(\nrule_name, claim,\nreason, correct_fact)\n→ CONTRADICTED, conf=0.95"]
+    MISS["Return None\n→ Proceed to evidence retrieval + NLI"]
 
-    INPUT --> R1
-    R1 -->|"Great Wall → China"| MATCH
-    R1 -->|"No"| R2
-    R2 -->|"Tokyo → Japan"| MATCH
-    R2 -->|"No"| R3
-    R3 -->|"London → UK"| MATCH
-    R3 -->|"No"| R4
-    R4 -->|"Brazil → South America"| MATCH
-    R4 -->|"No"| R5
-    R5 -->|"Einstein → physics"| MATCH
-    R5 -->|"No"| R6
-    R6 -->|"WWII → 1939-1945"| MATCH
-    R6 -->|"No"| R7
-    R7 -->|"Shakespeare → 1564-1616"| MATCH
-    R7 -->|"No"| R8
-    R8 -->|"Water → 100°C"| MATCH
-    R8 -->|"No"| R9
-    R9 -->|"Sun revolves Earth → False"| MATCH
-    R9 -->|"No"| NONE
+    CLAIM --> R1
+    R1 -->|"landmark + wrong location"| HIT
+    R1 -->|"no match"| R2
+    R2 -->|"capital + wrong country"| HIT
+    R2 -->|"no match"| R3
+    R3 -->|"city + wrong country"| HIT
+    R3 -->|"no match"| R4
+    R4 -->|"country + wrong continent"| HIT
+    R4 -->|"no match"| R5
+    R5 -->|"person + other's achievement"| HIT
+    R5 -->|"no match"| R6
+    R6 -->|"event + impossible year"| HIT
+    R6 -->|"no match"| R7
+    R7 -->|"person + wrong birth/death"| HIT
+    R7 -->|"no match"| R8
+    R8 -->|"science + wrong number"| HIT
+    R8 -->|"no match"| R9
+    R9 -->|"science statement = False"| HIT
+    R9 -->|"no match"| MISS
 
-    style MATCH fill:#ffcdd2,stroke:#c62828
-    style NONE fill:#c8e6c9,stroke:#2e7d32
+    style HIT fill:#FFCDD2
+    style MISS fill:#C8E6C9
 ```
 
 ---
 
-## 10. LLM Fallback Chain
+## 10. LLM Provider Fallback Chain (Actual Code)
 
 ```mermaid
-graph LR
-    REQ["LLM Request<br/>(claim decomposition,<br/>prompt optimization,<br/>corrections)"]
+graph TD
+    REQUEST["LLM.generate()\ncalled from: ClaimDecomposer,\nPromptOptimizer, Annotator"]
 
-    P1{"Primary Provider<br/>(configured)"}
-    OLLAMA["Ollama<br/>llama3.1:8b<br/>localhost:11434"]
-    GROQ["Groq API<br/>llama-3.1-8b-instant<br/>Free, 500 tok/s"]
-    ANTHRO["Anthropic<br/>Claude Sonnet<br/>(if API key set)"]
-    OPENAI["OpenAI<br/>GPT-4o-mini<br/>(if API key set)"]
-    SPACY["spaCy Fallback<br/>en_core_web_sm<br/>Sentence segmentation"]
-    NONE["provider='none'<br/>Skip LLM entirely"]
+    PROVIDER{"config.llm.provider"}
 
-    REQ --> P1
-    P1 -->|"ollama"| OLLAMA
-    P1 -->|"groq"| GROQ
-    P1 -->|"none"| NONE
+    NONE_CHECK["provider = 'none'\n→ Return None immediately\n→ spaCy fallback in caller"]
 
-    OLLAMA -->|"fail"| GROQ
-    GROQ -->|"fail"| ANTHRO
-    ANTHRO -->|"fail"| OPENAI
-    OPENAI -->|"fail"| SPACY
-    NONE --> SPACY
+    GROQ_AUTO{"GROQ_API_KEY set\nAND provider = 'none'?"}
+    AUTO_SWITCH["Auto-switch to 'groq'\n(config.py line 77)"]
 
-    style OLLAMA fill:#c8e6c9,stroke:#2e7d32
-    style GROQ fill:#c8e6c9,stroke:#2e7d32
-    style ANTHRO fill:#fff9c4,stroke:#f57f17
-    style OPENAI fill:#fff9c4,stroke:#f57f17
-    style SPACY fill:#ffcdd2,stroke:#c62828
-    style NONE fill:#e0e0e0,stroke:#616161
+    PRIMARY["Try primary provider"]
+
+    OLLAMA_TRY["Ollama\nPOST localhost:11434/api/generate\nmodel: llama3.1:8b\n2 retries, 0.5s backoff"]
+
+    GROQ_TRY["Groq\nPOST api.groq.com/openai/v1/chat/completions\nmodel: llama-3.1-8b-instant\nBearer token auth, urllib"]
+
+    ANTHRO_TRY["Anthropic\nclient.messages.create()\nmodel: claude-sonnet-4-20250514\n(only if ANTHROPIC_API_KEY set)"]
+
+    OPENAI_TRY["OpenAI\nclient.chat.completions.create()\nmodel: gpt-4o-mini\n(only if OPENAI_API_KEY set)"]
+
+    SUCCESS["Return response text"]
+    FAIL["Return None\n→ Caller uses spaCy fallback"]
+
+    REQUEST --> PROVIDER
+    PROVIDER -->|"'none'"| GROQ_AUTO
+    GROQ_AUTO -->|"Yes"| AUTO_SWITCH
+    AUTO_SWITCH --> GROQ_TRY
+    GROQ_AUTO -->|"No"| NONE_CHECK
+
+    PROVIDER -->|"'ollama'"| OLLAMA_TRY
+    PROVIDER -->|"'groq'"| GROQ_TRY
+    PROVIDER -->|"'anthropic'"| ANTHRO_TRY
+    PROVIDER -->|"'openai'"| OPENAI_TRY
+
+    OLLAMA_TRY -->|"success"| SUCCESS
+    OLLAMA_TRY -->|"fail"| GROQ_TRY
+    GROQ_TRY -->|"success"| SUCCESS
+    GROQ_TRY -->|"fail"| ANTHRO_TRY
+    ANTHRO_TRY -->|"success"| SUCCESS
+    ANTHRO_TRY -->|"fail"| OPENAI_TRY
+    OPENAI_TRY -->|"success"| SUCCESS
+    OPENAI_TRY -->|"fail"| FAIL
+
+    style SUCCESS fill:#C8E6C9
+    style FAIL fill:#FFCDD2
+    style NONE_CHECK fill:#E0E0E0
 ```
 
 ---
 
-*All diagrams verified against codebase commit 3ec97e2 (April 17, 2026).*
-*Paste each mermaid code block into https://mermaid.live to render.*
+*All arrows verified against source code commit 3c282bd.*
+*Every decision branch matches actual if/elif/else in Python.*
