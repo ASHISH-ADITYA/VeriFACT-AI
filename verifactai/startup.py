@@ -27,16 +27,45 @@ def main() -> None:
 
     if not index_path.exists() or not meta_path.exists():
         print("=" * 50)
-        print("  No FAISS index found. Building small index...")
-        print("  This takes ~2-3 minutes on first deploy.")
+        print("  No FAISS index found. Building knowledge base...")
+        print("  Sources: Wikipedia + SQuAD + PubMed + FEVER")
+        print("  This takes ~15-20 minutes on first deploy.")
         print("=" * 50)
 
-        # Build index — 2500 articles balances coverage vs free-tier build time (~12 min)
         max_articles = int(os.environ.get("VERIFACT_INDEX_SIZE", "2500"))
 
-        from data.build_index import build_and_save, load_wikipedia
+        from data.build_index import (
+            build_and_save,
+            load_fever,
+            load_pubmed,
+            load_squad,
+            load_wikipedia,
+        )
 
+        # Build multi-source knowledge base
         chunks = load_wikipedia(max_articles)
+
+        # SQuAD: high-quality Wikipedia reading comprehension passages
+        try:
+            chunks.extend(load_squad())
+        except Exception as e:
+            print(f"  SQuAD failed: {e}, continuing...")
+
+        # PubMed: medical/scientific knowledge
+        try:
+            chunks.extend(load_pubmed())
+        except Exception as e:
+            print(f"  PubMed failed: {e}, continuing...")
+
+        # FEVER: fact verification claims with labels
+        try:
+            chunks.extend(load_fever())
+        except Exception as e:
+            print(f"  FEVER failed: {e}, continuing...")
+
+        # Skip Natural Questions on HF free tier (too slow)
+        os.environ["VERIFACT_SKIP_NQ"] = "1"
+
         build_and_save(chunks, cfg.retrieval.index_path, cfg.retrieval.metadata_path)
         print(f"Index ready: {index_path}")
     else:

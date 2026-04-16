@@ -314,12 +314,15 @@ def load_pubmed() -> list[dict]:
     """Download and chunk PubMed QA abstracts."""
     from datasets import load_dataset
 
-    print("[2/4] Downloading PubMed QA …")
+    print("[2/6] Downloading PubMed QA …")
     try:
         ds = load_dataset("qiaojin/PubMedQA", "pqa_labeled", split="train")
     except Exception:
-        # Fallback: try alternate name
-        ds = load_dataset("pubmed_qa", "pqa_labeled", split="train")
+        try:
+            ds = load_dataset("pubmed_qa", "pqa_labeled", split="train")
+        except Exception:
+            print("       PubMed QA unavailable, skipping")
+            return []
 
     print(f"       {len(ds):,} entries loaded")
 
@@ -333,16 +336,133 @@ def load_pubmed() -> list[dict]:
         url = f"https://pubmed.ncbi.nlm.nih.gov/{pubid}" if pubid else ""
         title = item.get("question", "PubMed Abstract")
         all_chunks.extend(
-            chunk_text(
-                context_text,
-                title,
-                "pubmed",
-                url,
-                cfg.retrieval.chunk_size,
-                cfg.retrieval.chunk_overlap,
-            )
+            chunk_text(context_text, title, "pubmed", url,
+                       cfg.retrieval.chunk_size, cfg.retrieval.chunk_overlap)
         )
     print(f"       {len(all_chunks):,} PubMed chunks created")
+    return all_chunks
+
+
+def load_natural_questions(max_items: int = 3000) -> list[dict]:
+    """Load Google Natural Questions — real user questions with Wikipedia-sourced answers."""
+    from datasets import load_dataset
+
+    print(f"[3/6] Downloading Natural Questions (up to {max_items:,}) …")
+    try:
+        ds = load_dataset("google-research-datasets/natural_questions", "default",
+                          split="train", streaming=True)
+    except Exception:
+        try:
+            ds = load_dataset("natural_questions", "default", split="train", streaming=True)
+        except Exception:
+            print("       Natural Questions unavailable, skipping")
+            return []
+
+    all_chunks: list[dict] = []
+    count = 0
+    for item in ds:
+        if count >= max_items:
+            break
+        # Extract short answer context
+        doc = item.get("document", {})
+        title = doc.get("title", "") if isinstance(doc, dict) else ""
+        tokens = doc.get("tokens", []) if isinstance(doc, dict) else []
+        if not tokens or not title:
+            continue
+        text = " ".join(tokens[:500])  # first 500 tokens
+        if len(text.split()) < 30:
+            continue
+        url = f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}"
+        all_chunks.extend(
+            chunk_text(text, title, "natural_questions", url,
+                       cfg.retrieval.chunk_size, cfg.retrieval.chunk_overlap)
+        )
+        count += 1
+
+    print(f"       {len(all_chunks):,} NQ chunks created from {count:,} articles")
+    return all_chunks
+
+
+def load_squad() -> list[dict]:
+    """Load SQuAD v2 — high-quality reading comprehension with Wikipedia contexts."""
+    from datasets import load_dataset
+
+    print("[4/6] Downloading SQuAD v2 …")
+    try:
+        ds = load_dataset("rajpurkar/squad_v2", split="train")
+    except Exception:
+        try:
+            ds = load_dataset("squad_v2", split="train")
+        except Exception:
+            print("       SQuAD unavailable, skipping")
+            return []
+
+    print(f"       {len(ds):,} entries loaded")
+
+    # Deduplicate by context (many questions share the same passage)
+    seen_contexts: set[int] = set()
+    all_chunks: list[dict] = []
+    for item in ds:
+        ctx = item.get("context", "")
+        if not ctx or len(ctx.split()) < 20:
+            continue
+        ctx_hash = hash(ctx[:200])
+        if ctx_hash in seen_contexts:
+            continue
+        seen_contexts.add(ctx_hash)
+        title = item.get("title", "SQuAD Article")
+        url = f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}"
+        all_chunks.extend(
+            chunk_text(ctx, title, "squad", url,
+                       cfg.retrieval.chunk_size, cfg.retrieval.chunk_overlap)
+        )
+
+    print(f"       {len(all_chunks):,} SQuAD chunks created ({len(seen_contexts):,} unique passages)")
+    return all_chunks
+
+
+def load_fever(max_items: int = 5000) -> list[dict]:
+    """Load FEVER — fact verification dataset with labeled claims + evidence."""
+    from datasets import load_dataset
+
+    print(f"[5/6] Downloading FEVER (up to {max_items:,}) …")
+    try:
+        ds = load_dataset("fever/fever", "v1.0", split="train")
+    except Exception:
+        try:
+            ds = load_dataset("fever", "v1.0", split="train")
+        except Exception:
+            print("       FEVER unavailable, skipping")
+            return []
+
+    all_chunks: list[dict] = []
+    count = 0
+    for item in ds:
+        if count >= max_items:
+            break
+        evidence_info = item.get("evidence_wiki_url", "")
+        claim = item.get("claim", "")
+        label = item.get("label", "")
+        if not claim or label == "NOT ENOUGH INFO":
+            continue
+        # Use the claim + label as a fact record
+        if label == "SUPPORTS":
+            text = f"{claim} This claim is factually supported."
+        elif label == "REFUTES":
+            text = f"{claim} This claim is factually incorrect."
+        else:
+            continue
+        title = evidence_info.replace("_", " ") if evidence_info else "FEVER Claim"
+        url = f"https://en.wikipedia.org/wiki/{evidence_info}" if evidence_info else ""
+        all_chunks.append({
+            "text": text,
+            "source": "fever",
+            "title": title,
+            "url": url,
+        })
+        count += 1
+
+    print(f"       {len(all_chunks):,} FEVER fact records created")
     return all_chunks
 
 
@@ -388,7 +508,8 @@ def build_and_save(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build VeriFactAI knowledge index")
-    parser.add_argument("--wiki-only", action="store_true", help="Skip PubMed")
+    parser.add_argument("--wiki-only", action="store_true", help="Only Wikipedia")
+    parser.add_argument("--fast", action="store_true", help="Wikipedia + SQuAD only (fastest)")
     parser.add_argument(
         "--max-articles",
         type=int,
@@ -398,8 +519,17 @@ def main() -> None:
     args = parser.parse_args()
 
     all_chunks = load_wikipedia(args.max_articles)
+
     if not args.wiki_only:
-        all_chunks.extend(load_pubmed())
+        # SQuAD is the best bang-for-buck: high-quality Wikipedia passages, fast to load
+        all_chunks.extend(load_squad())
+
+        if not args.fast:
+            all_chunks.extend(load_pubmed())
+            all_chunks.extend(load_fever())
+            # Natural Questions is large/slow — only if we have time budget
+            if not os.environ.get("VERIFACT_SKIP_NQ"):
+                all_chunks.extend(load_natural_questions())
 
     print(f"\nTotal corpus: {len(all_chunks):,} chunks")
     build_and_save(
