@@ -563,10 +563,11 @@ class EvidenceRetriever:
     # ------------------------------------------------------------------
     @staticmethod
     def _wiki_api_search(query: str, max_results: int = 3) -> list[Evidence]:
-        """Search Wikipedia API for evidence when local FAISS results are weak.
+        """Search Wikipedia API for evidence — full article text, not just intro.
 
-        This gives access to ALL 6.8M English Wikipedia articles without storing
-        anything locally. Used as fallback when local evidence similarity is low.
+        Gets the FULL article, then extracts the most relevant section by
+        finding paragraphs that contain the query's key terms.
+        This gives deep evidence from ALL 6.8M English Wikipedia articles.
         """
         import urllib.error
         import urllib.request
@@ -584,37 +585,56 @@ class EvidenceRetriever:
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
             return []
 
+        # Extract key terms from query for paragraph matching
+        stop = {"the", "a", "an", "is", "was", "are", "were", "in", "on", "at", "of", "to", "and", "or", "for", "by", "it", "its", "that", "this", "with", "from", "as", "be", "has", "had", "not"}
+        query_terms = {w.lower() for w in re.findall(r"[a-zA-Z]{3,}", query)} - stop
+
         results: list[Evidence] = []
         for item in data.get("query", {}).get("search", []):
             title = item.get("title", "")
-            # Strip HTML from snippet
             snippet = re.sub(r"<[^>]+>", "", item.get("snippet", ""))
             if not snippet or len(snippet) < 20:
                 continue
 
-            # Step 2: Get first paragraph of the article for better evidence
+            # Step 2: Get FULL article text (not just intro)
             extract_url = (
                 f"https://en.wikipedia.org/w/api.php?action=query&titles={urllib.parse.quote(title)}"
-                f"&prop=extracts&exintro=1&explaintext=1&exsentences=5&format=json&utf8=1"
+                f"&prop=extracts&explaintext=1&format=json&utf8=1"
             )
             try:
                 req2 = urllib.request.Request(extract_url, headers={"User-Agent": "VeriFACT-AI/1.0"})
-                with urllib.request.urlopen(req2, timeout=5) as resp2:
+                with urllib.request.urlopen(req2, timeout=6) as resp2:
                     extract_data = json.loads(resp2.read().decode("utf-8"))
                 pages = extract_data.get("query", {}).get("pages", {})
-                extract_text = ""
+                full_text = ""
                 for page in pages.values():
-                    extract_text = page.get("extract", "")
+                    full_text = page.get("extract", "")
                     break
-                if extract_text and len(extract_text) > 30:
-                    text = extract_text[:500]  # Cap at 500 chars
-                else:
-                    text = snippet
             except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
-                text = snippet
+                full_text = snippet
+
+            if not full_text or len(full_text) < 30:
+                full_text = snippet
+
+            # Step 3: Find the MOST RELEVANT paragraph in the full article
+            # Split into paragraphs and score each by query term overlap
+            paragraphs = [p.strip() for p in full_text.split("\n") if len(p.strip()) > 40]
+            if not paragraphs:
+                best_text = full_text[:600]
+            else:
+                scored = []
+                for para in paragraphs:
+                    para_words = {w.lower() for w in re.findall(r"[a-zA-Z]{3,}", para)}
+                    overlap = len(query_terms & para_words)
+                    scored.append((overlap, para))
+                scored.sort(key=lambda x: x[0], reverse=True)
+
+                # Take the top 2 most relevant paragraphs
+                best_paras = [p for _, p in scored[:2]]
+                best_text = " ".join(best_paras)[:800]
 
             results.append(Evidence(
-                text=text,
+                text=best_text,
                 source="wikipedia_live",
                 title=title,
                 url=f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}",
