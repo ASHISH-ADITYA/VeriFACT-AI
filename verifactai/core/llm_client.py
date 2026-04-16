@@ -68,7 +68,7 @@ class LLMClient:
                     "base_url": "https://api.groq.com/openai/v1",
                     "api_key": self.config.groq_api_key,
                 }
-                logger.info("Groq configured (model=llama-3.1-8b-instant)")
+                logger.info("Groq configured (model=llama-3.1-70b-versatile)")
             elif provider == "anthropic":
                 import anthropic
 
@@ -185,7 +185,7 @@ class LLMClient:
     # Fallback model names when primary model is Ollama-specific.
     # Only used when fallback chain reaches a paid provider.
     _FALLBACK_MODELS = {
-        "groq": "llama-3.1-8b-instant",
+        "groq": "llama-3.1-70b-versatile",
         "anthropic": "claude-sonnet-4-20250514",
         "openai": "gpt-4o-mini",
     }
@@ -200,7 +200,7 @@ class LLMClient:
         if provider == "ollama":
             return model
         if provider == "groq":
-            return "llama-3.1-8b-instant"
+            return "llama-3.1-70b-versatile"
         # Ollama model names contain ':' — not valid for cloud providers
         if ":" in model or model.startswith("llama") or model.startswith("qwen"):
             fallback = self._FALLBACK_MODELS.get(provider, model)
