@@ -288,9 +288,9 @@ class VerdictEngine:
         """
         # Contradiction-aware evidence mining
         best_contra_nli = max(nli_results, key=lambda r: r.contradiction)
-        has_real_contradiction_evidence = (
-            best_contra_nli.contradiction > 0.50 and best_contra_nli.evidence.similarity > 0.30
-        )
+
+        # Best evidence similarity across all retrieved passages
+        max_similarity = max(r.evidence.similarity for r in nli_results)
 
         # Aggregate with specificity gate
         max_con = max(r.contradiction for r in nli_results)
@@ -316,17 +316,37 @@ class VerdictEngine:
         )
         best_support = nli_results[best_support_idx]
 
-        # Verdict label
+        # Verdict label — evidence quality matters
         nc = self.config.nli
 
-        is_contradicted = (max_con > nc.contradiction_threshold and max_con > max_raw_ent) or (
-            max_con > 0.50 and max_con > max_specific_ent
+        # Hard contradiction: strong NLI signal + relevant evidence
+        hard_contra = max_con > nc.contradiction_threshold and max_con > max_raw_ent
+
+        # Soft contradiction: moderate NLI signal BUT evidence must be relevant
+        # Without this similarity check, irrelevant evidence causes false contradictions
+        soft_contra = (
+            max_con > 0.50
+            and max_con > max_specific_ent
+            and best_contra.evidence.similarity > similarity_gate
         )
+
+        # Contradiction fallback: strong contradiction on high-quality evidence only
+        has_real_contradiction_evidence = (
+            best_contra_nli.contradiction > 0.60
+            and best_contra_nli.evidence.similarity > 0.50
+        )
+
+        is_contradicted = hard_contra or soft_contra
 
         if is_contradicted:
             label = "CONTRADICTED"
             best_ev = best_contra.evidence
         elif max_specific_ent > nc.entailment_threshold:
+            label = "SUPPORTED"
+            best_ev = best_support.evidence
+        elif max_raw_ent > 0.50 and max_similarity > similarity_gate:
+            # Relaxed support: evidence is relevant and entailing, even if not
+            # passing the strict specificity gate product threshold
             label = "SUPPORTED"
             best_ev = best_support.evidence
         elif has_real_contradiction_evidence:

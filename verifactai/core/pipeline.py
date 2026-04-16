@@ -355,9 +355,9 @@ class VeriFactPipeline:
 
         start = time.perf_counter()
 
-        # Stage 1 — Claim Decomposition (spaCy fallback, fast)
-        claims = self.decomposer.decompose(text)
-        logger.info(f"[fast] Stage 1: {len(claims)} claims extracted")
+        # Stage 1 — Claim Decomposition (spaCy fallback, fast, capped at 8)
+        claims = self.decomposer.decompose(text)[:8]
+        logger.info(f"[fast] Stage 1: {len(claims)} claims extracted (capped at 8)")
 
         # Stage 2a — Rule check (instant)
         from core.evidence_retriever import Evidence
