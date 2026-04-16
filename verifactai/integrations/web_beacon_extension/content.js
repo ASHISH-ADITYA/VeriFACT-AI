@@ -406,6 +406,8 @@ async function optimizePrompt(text) {
   } catch { return null; }
 }
 
+let lastSuggestedPrompt = "";
+
 function showPromptTip(data) {
   if (!data || !data.improvements || !data.improvements.length) { hidePromptTip(); return; }
   if (!promptTip) {
@@ -414,23 +416,50 @@ function showPromptTip(data) {
     document.body.appendChild(promptTip);
   }
 
+  lastSuggestedPrompt = data.suggested || "";
+
   const inputEl = getInputElement();
   if (inputEl) {
     const r = inputEl.getBoundingClientRect();
     promptTip.style.left = r.left + "px";
     promptTip.style.bottom = (innerHeight - r.top + 8) + "px";
+    promptTip.style.width = Math.min(r.width, 480) + "px";
   }
 
-  const improvHtml = data.improvements.map((i) => `<div class="vf-pt-item">${i.replace(/</g, "&lt;")}</div>`).join("");
+  const improvHtml = data.improvements.slice(0, 3).map((i) => `<div class="vf-pt-item">${i.replace(/</g, "&lt;")}</div>`).join("");
   promptTip.innerHTML = `
     <div class="vf-pt-header">
       <span class="vf-pt-logo">VF</span>
-      <span class="vf-pt-title">Prompt Suggestions</span>
+      <span class="vf-pt-title">Prompt Suggestion</span>
       <span class="vf-pt-score">${data.score || 0}/100</span>
     </div>
     ${improvHtml}
-    ${data.suggested ? `<div class="vf-pt-suggested"><strong>Try:</strong> ${data.suggested.replace(/</g, "&lt;").substring(0, 200)}</div>` : ""}
+    ${lastSuggestedPrompt ? `<div class="vf-pt-suggested">${lastSuggestedPrompt.replace(/</g, "&lt;").substring(0, 300)}</div>` : ""}
+    <div class="vf-pt-buttons">
+      <button class="vf-pt-accept" data-action="accept">Accept Suggested</button>
+      <button class="vf-pt-dismiss" data-action="dismiss">Use Original</button>
+    </div>
   `;
+
+  // Button handlers
+  promptTip.querySelector(".vf-pt-accept")?.addEventListener("click", () => {
+    const el = getInputElement();
+    if (el && lastSuggestedPrompt) {
+      if (el.innerText !== undefined && el.contentEditable === "true") {
+        el.innerText = lastSuggestedPrompt;
+      } else {
+        el.value = lastSuggestedPrompt;
+      }
+      // Trigger input event so chatbot UI picks up the change
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    hidePromptTip();
+  });
+
+  promptTip.querySelector(".vf-pt-dismiss")?.addEventListener("click", () => {
+    hidePromptTip();
+  });
+
   promptTip.classList.add("show");
 }
 
