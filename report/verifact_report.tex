@@ -417,12 +417,7 @@ Science true/false & 8 & ``Sun revolves around Earth'' $\rightarrow$ False \\
 
 A matched claim is immediately labeled CONTRADICTED with 0.95 confidence and bypasses all subsequent NLI processing. Latency: $<$1\,ms per claim.
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.7\textwidth]{fig/10.png}
-\caption{Rule engine decision flow across 9 categories (205 total entries).}
-\label{fig:rules}
-\end{figure}
+% Rule engine diagram removed to reduce compile time (covered by Table~\ref{tab:rules})
 
 \textbf{Implementation:} \texttt{fact\_rules.py} (450 lines of code).
 
@@ -493,13 +488,6 @@ where $\text{sim}(e, h)$ is the retrieval similarity. A claim is labeled SUPPORT
 \subsection{Stage 4: SelfCheck Consistency Scoring}
 \label{sec:selfcheck}
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.85\textwidth]{fig/9.png}
-\caption{SelfCheck two-path architecture: LLM sampling vs.\ NLI fallback.}
-\label{fig:selfcheck}
-\end{figure}
-
 Following the methodology of Manakul et al.\ \cite{manakul2023selfcheck}, the system performs self-consistency sampling:
 
 \textbf{LLM path:} Five LLM samples at temperatures $\{0.10, 0.25, 0.40, 0.55, 0.70\}$, each producing a label $\in$ \{supported, contradicted, uncertain\}.
@@ -558,13 +546,6 @@ For CONTRADICTED claims, the system optionally generates corrections:
 \textbf{Implementation:} \texttt{annotator.py} (310 lines of code).
 
 \section{LLM Fallback Chain}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=\textwidth]{fig/6.png}
-\caption{LLM provider fallback chain.}
-\label{fig:fallback}
-\end{figure}
 
 The system supports four LLM providers with automatic fallback: Groq (free, Llama~3.1 70B at 500~tok/s) $\rightarrow$ Ollama (free, local) $\rightarrow$ Anthropic (Claude, if API key set) $\rightarrow$ OpenAI (GPT-4o-mini, if API key set) $\rightarrow$ spaCy (zero-LLM sentence segmentation).
 
@@ -853,12 +834,6 @@ Each pipeline stage contributes measurably to overall accuracy:
 % ════════════════════════════════════════════════════════
 \chapter{Deployment and Operations}
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.85\textwidth]{fig/8.png}
-\caption{Deployment architecture: HuggingFace Spaces + Vercel + free APIs.}
-\label{fig:deployment}
-\end{figure}
 \label{ch:deployment}
 
 \section{HuggingFace Spaces Deployment}
