@@ -321,8 +321,10 @@ class OverlayHandler(BaseHTTPRequestHandler):
         if not _API_TOKEN:
             return False
 
+        import hmac
+
         token = (self.headers.get("X-VeriFact-Token") or "").strip()
-        return bool(token) and token == _API_TOKEN
+        return bool(token) and hmac.compare_digest(token, _API_TOKEN)
 
     def _json_response(self, code: int, payload: dict[str, Any]) -> None:
         body = json.dumps(payload).encode("utf-8")
