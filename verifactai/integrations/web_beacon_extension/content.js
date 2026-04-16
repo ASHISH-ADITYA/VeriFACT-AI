@@ -112,9 +112,22 @@ beacon.addEventListener("click", (e) => {
 
 function getAssistantNodes() {
   let nodes;
-  if (PLATFORM === "chatgpt") nodes = document.querySelectorAll("[data-message-author-role='assistant']");
-  else if (PLATFORM === "gemini") nodes = document.querySelectorAll("message-content .markdown, model-response .markdown, model-response");
-  else nodes = document.querySelectorAll("div[data-is-streaming], div.prose, div.font-claude-message");
+  if (PLATFORM === "chatgpt") {
+    nodes = document.querySelectorAll("[data-message-author-role='assistant']");
+  } else if (PLATFORM === "gemini") {
+    // Gemini 2025/2026 DOM selectors (multiple fallbacks)
+    nodes = document.querySelectorAll(
+      "message-content .markdown, model-response .markdown, model-response, " +
+      ".response-container .markdown, div[data-message-id] .markdown, " +
+      ".conversation-container .model-response-text, .response-content"
+    );
+  } else {
+    // Claude
+    nodes = document.querySelectorAll(
+      "div[data-is-streaming], div.prose, div.font-claude-message, " +
+      "div[class*='claude'], div[class*='response']"
+    );
+  }
   return Array.from(nodes).filter((n) => (n.innerText?.trim().length || 0) > 30);
 }
 
