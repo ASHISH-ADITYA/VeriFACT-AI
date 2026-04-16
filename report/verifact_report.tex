@@ -108,13 +108,7 @@
 % ── Justified text globally ───────────────────────────
 \justifying
 
-% ── Figure borders ────────────────────────────────────
-% All figures get a thin border
-\usepackage[export]{adjustbox}
-\let\oldincludegraphics\includegraphics
-\renewcommand{\includegraphics}[2][]{%
-  \oldincludegraphics[#1,frame]{#2}%
-}
+% ── Figure borders (manual, use \fboxed{} around figures) ──
 
 % ── Enhanced table row spacing ────────────────────────
 \renewcommand{\arraystretch}{1.3}
@@ -150,7 +144,7 @@
     % ---- University Logo ----
 \begin{figure}
         \centering
-        \includegraphics[width=0.5\linewidth]{Central_University_of_Jharkhand_logo.png}
+        \includegraphics[width=0.5\linewidth]{example-image}
        
         \label{fig:placeholder}
     \end{figure}
@@ -180,7 +174,7 @@
 \begin{center}
     {\Large\textbf{Certificate}}\\[1.5cm]
 
-   \includegraphics[width=0.4\linewidth]{Central_University_of_Jharkhand_logo.png}
+   \includegraphics[width=0.4\linewidth]{example-image}
 \end{center}
 
 \noindent
