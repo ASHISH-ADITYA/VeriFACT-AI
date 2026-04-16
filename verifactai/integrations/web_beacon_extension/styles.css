@@ -163,6 +163,13 @@
   color: #fff;
   margin-bottom: 8px;
   box-shadow: 0 4px 16px rgba(99,102,241,0.4);
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.vf-logo:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(99,102,241,0.55);
 }
 
 .vf-title {

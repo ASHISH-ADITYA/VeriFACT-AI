@@ -358,7 +358,7 @@ function renderDashboard() {
   panelEl.innerHTML = `<div class="vf-dash-inner">
     <button class="vf-close" title="Close">&times;</button>
     <div class="vf-dash-header">
-      <div class="vf-logo">VF</div>
+      <a href="https://web-five-mocha-51.vercel.app" target="_blank" rel="noreferrer" class="vf-logo" title="Open VeriFACT Dashboard">VF</a>
       <div class="vf-title">VeriFACT AI</div>
       <div class="vf-subtitle">${PLATFORM.charAt(0).toUpperCase() + PLATFORM.slice(1)} &middot; ${msgs} messages scanned</div>
     </div>
@@ -372,9 +372,6 @@ function renderDashboard() {
     <div class="vf-divider"></div>
     <div class="vf-section-title">${issues.length ? issues.length + ' Issue' + (issues.length > 1 ? 's' : '') + ' Found' : 'Conversation Clean'}</div>
     <div class="vf-cards">${cardsHtml}</div>
-    <a href="https://web-five-mocha-51.vercel.app" target="_blank" rel="noreferrer" class="vf-web-link">
-      <span class="vf-web-icon">&#x1F48E;</span> Open VeriFACT Dashboard
-    </a>
     <div class="vf-footer">DeBERTa-v3 NLI &middot; Wikipedia + BM25 &middot; Rule Engine</div>
   </div>`;
 
