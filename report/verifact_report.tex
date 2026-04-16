@@ -41,11 +41,6 @@
 \usepackage{float}
 \usepackage{url}
 \usepackage{pdfpages}
-\usepackage{tikz}
-\usetikzlibrary{positioning, arrows.meta, shapes.geometric, fit, backgrounds, calc, decorations.pathreplacing, chains}
-
-% Load TikZ diagram commands
-\input{diagrams}
 
 % ── Page Style ────────────────────────────────────────
 \pagestyle{fancy}
@@ -123,56 +118,79 @@
 
 % ── Title Page ────────────────────────────────────────
 \begin{titlepage}
-\centering
-\vspace*{1cm}
+\begin{center}
 
-{\Large\textbf{Central University of Jharkhand, Ranchi}}\\[0.3cm]
-{\large Department of Computer Science and Engineering}\\[1cm]
+    
+    {\Large\textbf{VeriFACT AI: Real-Time LLM Hallucination Detection.}}\\[0.3cm]
+    {\large via Hybrid Retrieval and DeBERTa-based NLI}\\[1cm]
+    
+    % ---- University Logo ----
+\begin{figure}
+        \centering
+        \includegraphics[width=0.5\linewidth]{Central_University_of_Jharkhand_logo.png}
+       
+        \label{fig:placeholder}
+    \end{figure}
+        % -------------------------
 
-\rule{\linewidth}{0.5pt}\\[0.4cm]
-{\LARGE\bfseries VeriFACT AI: Real-Time LLM Hallucination Detection Using Retrieval-Augmented Verification}\\[0.2cm]
-\rule{\linewidth}{0.5pt}\\[1.5cm]
+    {\large\textbf{Under the Supervision of}}\\[0.2cm]
+    {\Large\textbf{Dr. Pushpendra Kumar}}\\[0.6cm]
 
-{\large A Project Report}\\[0.2cm]
-{\large Submitted in Partial Fulfillment of the Requirements for the Degree of}\\[0.2cm]
-{\large\textbf{Bachelor of Technology}}\\[0.2cm]
-{\large in}\\[0.2cm]
-{\large\textbf{Computer Science and Engineering}}\\[1.5cm]
+    {\large\textbf{Submitted By}}\\[0.2cm]
+    {\large\textbf{Aditya Ashish}}\\
+    {\large Regd. No.: 22190503004}\\[0.8cm]
 
-{\large Submitted By:}\\[0.3cm]
-{\Large\textbf{Aditya Ashish}}\\[0.8cm]
+    {\large\textbf{DEPARTMENT OF COMPUTER SCIENCE AND ENGINEERING}}\\[0.2cm]
+    {\large\textbf{CENTRAL UNIVERSITY OF JAHRKHAND}}\\[0.2cm]
+    {\large\textbf{RANCHI, JHARKHAND – 835222}}\\[0.8cm]
 
-{\large Under the Supervision of:}\\[0.3cm]
-\rule{5cm}{0.4pt}\\[1.5cm]
+    {\large Academic Year 2025–2026}\\[0.5cm]
 
-{\large Academic Year: 2025--2026}\\[0.5cm]
-
-\vfill
-{\small Central University of Jharkhand, Ranchi, Jharkhand, India}
+\end{center}
 \end{titlepage}
+\clearpage
 
 % ── Certificate of Examination ────────────────────────
 \newpage
 \thispagestyle{empty}
+\thispagestyle{empty}
+
 \begin{center}
-{\Large\bfseries Certificate of Examination}\\[1cm]
+    {\Large\textbf{Certificate}}\\[1.5cm]
+
+   \includegraphics[width=0.5\linewidth]{Central_University_of_Jharkhand_logo.png}
+    \label{fig:placeholder}
+\begin{figure}
+    \centering
+    
+\end{figure}
 \end{center}
 
-This is to certify that the project report entitled \textbf{``VeriFACT AI: Real-Time LLM Hallucination Detection Using Retrieval-Augmented Verification''} submitted by \textbf{Aditya Ashish} is a record of bona fide work carried out by the candidate under the Department of Computer Science and Engineering, Central University of Jharkhand, Ranchi, in partial fulfillment of the requirements for the degree of Bachelor of Technology in Computer Science and Engineering during the academic year 2025--2026.
-
-\vspace{2cm}
+\noindent
+\textbf{Name:} Aditya Ashish\\
+\textbf{Registration Number:} 22190503004\\
+\textbf{Title of the Project:} MRI Brain Tumor Detection System Using VGG16\\[0.8cm]
 
 \noindent
-\begin{tabular}{p{6cm}p{6cm}}
-\rule{5cm}{0.4pt} & \rule{5cm}{0.4pt} \\
-Internal Examiner & External Examiner \\[2cm]
-\rule{5cm}{0.4pt} & \\
-Head of Department & \\
-\end{tabular}
+This is to certify that the project report entitled 
+\textit{``VeriFACT AI: Real-Time LLM Hallucination Detection via Hybrid Retrieval and DeBERTa-based NLI''}
+submitted by \textbf{Aditya Ashish} (Regd. No. 22190503004) of 
+\textbf{Computer Science and Engineering}, Central University of Jharkhand, Ranchi, Jharkhand
+has been examined by us. We are satisfied with the volume, quality, and correctness of the work.\\[2cm]
 
-\vspace{1cm}
-\noindent Date: \rule{3cm}{0.4pt} \hfill Place: Ranchi
+\noindent
+\begin{flushright}
+\begin{minipage}{6cm}
+\rule{\linewidth}{0.4pt}\\
+\centering \textit{HOD, Dept. of CSE}
+\end{minipage}
+\end{flushright}
 
+
+
+
+
+\clearpage
 % ── Declaration ───────────────────────────────────────
 \newpage
 \thispagestyle{empty}
@@ -315,7 +333,7 @@ Each of the 14 research papers reviewed (stored in the project's \texttt{/archit
 
 \begin{figure}[H]
 \centering
-\DiagramArchitecture{}
+\includegraphics[width=\textwidth]{fig/1.png}
 \caption{Four-tier system architecture of \verifact{}.}
 \label{fig:architecture}
 \end{figure}
@@ -331,7 +349,7 @@ Each of the 14 research papers reviewed (stored in the project's \texttt{/archit
 
 \begin{figure}[H]
 \centering
-\DiagramPipeline{}
+\includegraphics[width=\textwidth]{fig/2.png}
 \caption{Six-stage verification pipeline of \verifact{}.}
 \label{fig:pipeline}
 \end{figure}
@@ -384,6 +402,13 @@ Science true/false & 8 & ``Sun revolves around Earth'' $\rightarrow$ False \\
 
 A matched claim is immediately labeled CONTRADICTED with 0.95 confidence and bypasses all subsequent NLI processing. Latency: $<$1\,ms per claim.
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{fig/10.png}
+\caption{Rule engine decision flow across 9 categories (205 total entries).}
+\label{fig:rules}
+\end{figure}
+
 \textbf{Implementation:} \texttt{fact\_rules.py} (450 lines of code).
 
 \subsection{Stage 2b: Evidence Retrieval}
@@ -393,7 +418,7 @@ For unresolved claims, a five-layer hybrid retrieval system gathers evidence fro
 
 \begin{figure}[H]
 \centering
-\DiagramRetrieval{}
+\includegraphics[width=\textwidth]{fig/3.png}
 \caption{Hybrid evidence retrieval pipeline.}
 \label{fig:retrieval}
 \end{figure}
@@ -423,7 +448,7 @@ The retrieved evidence is evaluated against each claim using the \texttt{cross-e
 
 \begin{figure}[H]
 \centering
-\DiagramVerdict{}
+\includegraphics[width=\textwidth]{fig/4.png}
 \caption{Verdict decision tree in the NLI engine.}
 \label{fig:nli_verdict}
 \end{figure}
@@ -452,6 +477,13 @@ where $\text{sim}(e, h)$ is the retrieval similarity. A claim is labeled SUPPORT
 
 \subsection{Stage 4: SelfCheck Consistency Scoring}
 \label{sec:selfcheck}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig/9.png}
+\caption{SelfCheck two-path architecture: LLM sampling vs.\ NLI fallback.}
+\label{fig:selfcheck}
+\end{figure}
 
 Following the methodology of Manakul et al.\ \cite{manakul2023selfcheck}, the system performs self-consistency sampling:
 
@@ -514,7 +546,7 @@ For CONTRADICTED claims, the system optionally generates corrections:
 
 \begin{figure}[H]
 \centering
-\DiagramFallback{}
+\includegraphics[width=\textwidth]{fig/6.png}
 \caption{LLM provider fallback chain.}
 \label{fig:fallback}
 \end{figure}
@@ -658,7 +690,7 @@ The extension (Manifest~V3) injects \texttt{content.js} into ChatGPT, Claude, Ge
 
 \begin{figure}[H]
 \centering
-\DiagramExtension{}
+\includegraphics[width=\textwidth]{fig/7.png}
 \caption{Chrome extension user interface.}
 \label{fig:extension}
 \end{figure}
@@ -784,26 +816,7 @@ Local (M4) & 5 & 2--5\,s & MacBook Air M4, MPS acceleration \\
 
 \begin{figure}[H]
 \centering
-% Accuracy comparison as a simple TikZ bar chart
-\begin{tikzpicture}[font=\small]
-\draw[thick] (0,0) -- (0,4.5);
-\draw[thick] (0,0) -- (8,0);
-% Y-axis labels
-\foreach \y/\v in {0/0, 1/25, 2/50, 3/75, 4/100} {
-    \draw (-0.1,\y) -- (0.1,\y) node[left=0.2cm] {\v\%};
-}
-% Bars
-\fill[green!40] (0.5,0) rectangle (1.5,3.752); \node[font=\scriptsize, above] at (1,3.752) {93.8\%};
-\node[font=\scriptsize, below] at (1,-0.2) {HaluEval};
-\fill[blue!40] (2,0) rectangle (3,3.28); \node[font=\scriptsize, above] at (2.5,3.28) {82\%};
-\node[font=\scriptsize, below] at (2.5,-0.2) {Adversarial};
-\fill[green!60] (3.5,0) rectangle (4.5,4); \node[font=\scriptsize, above] at (4,4) {100\%};
-\node[font=\scriptsize, below] at (4,-0.2) {Live Mix};
-\fill[green!60] (5,0) rectangle (6,4); \node[font=\scriptsize, above] at (5.5,4) {100\%};
-\node[font=\scriptsize, below] at (5.5,-0.2) {Rules};
-\fill[red!30] (6.5,0) rectangle (7.5,1.764); \node[font=\scriptsize, above] at (7,1.764) {44.1\%};
-\node[font=\scriptsize, below] at (7,-0.2) {TruthfulQA};
-\end{tikzpicture}
+\includegraphics[width=\textwidth]{fig/5.png}
 \caption{Accuracy comparison across evaluation benchmarks.}
 \label{fig:benchmark}
 \end{figure}
@@ -824,6 +837,13 @@ Each pipeline stage contributes measurably to overall accuracy:
 % CHAPTER 5 — DEPLOYMENT & OPERATIONS
 % ════════════════════════════════════════════════════════
 \chapter{Deployment and Operations}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig/8.png}
+\caption{Deployment architecture: HuggingFace Spaces + Vercel + free APIs.}
+\label{fig:deployment}
+\end{figure}
 \label{ch:deployment}
 
 \section{HuggingFace Spaces Deployment}
