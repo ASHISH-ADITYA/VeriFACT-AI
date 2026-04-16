@@ -383,11 +383,11 @@ def load_natural_questions(max_items: int = 3000) -> list[dict]:
     return all_chunks
 
 
-def load_squad() -> list[dict]:
+def load_squad(max_passages: int = 3000) -> list[dict]:
     """Load SQuAD v2 — high-quality reading comprehension with Wikipedia contexts."""
     from datasets import load_dataset
 
-    print("[4/6] Downloading SQuAD v2 …")
+    print(f"[4/6] Downloading SQuAD v2 (up to {max_passages:,} passages) …")
     try:
         ds = load_dataset("rajpurkar/squad_v2", split="train")
     except Exception:
@@ -403,6 +403,8 @@ def load_squad() -> list[dict]:
     seen_contexts: set[int] = set()
     all_chunks: list[dict] = []
     for item in ds:
+        if len(seen_contexts) >= max_passages:
+            break
         ctx = item.get("context", "")
         if not ctx or len(ctx.split()) < 20:
             continue
