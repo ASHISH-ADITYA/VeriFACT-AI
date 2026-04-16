@@ -34,22 +34,11 @@ def main() -> None:
 
         max_articles = int(os.environ.get("VERIFACT_INDEX_SIZE", "2500"))
 
-        from data.build_index import (
-            build_and_save,
-            load_fever,
-            load_pubmed,
-            load_squad,
-            load_wikipedia,
-        )
+        from data.build_index import build_and_save, load_wikipedia
 
-        # Build knowledge base — lean for free CPU (must finish in <25 min)
+        # Build Wikipedia-only index — must finish in <20 min on free CPU
+        # Live Wikipedia API (6.8M articles) handles everything else at query time
         chunks = load_wikipedia(max_articles)
-
-        # FEVER: labeled fact claims — small, fast, high value for accuracy
-        try:
-            chunks.extend(load_fever())
-        except Exception as e:
-            print(f"  FEVER failed: {e}, continuing...")
 
         build_and_save(chunks, cfg.retrieval.index_path, cfg.retrieval.metadata_path)
         print(f"Index ready: {index_path}")
