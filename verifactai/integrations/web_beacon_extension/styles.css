@@ -332,13 +332,38 @@
   border: 1px solid rgba(34,197,94,0.12);
 }
 
+/* ── Web Link Button ─────────────────────────────────── */
+
+.vf-web-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.vf-web-link:hover {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.35);
+  color: #c7d2fe;
+}
+.vf-web-icon { font-size: 14px; }
+
 /* ── Footer ──────────────────────────────────────────── */
 
 .vf-footer {
   text-align: center;
   font-size: 9px;
   color: rgba(255,255,255,0.25);
-  margin-top: 14px;
+  margin-top: 10px;
   letter-spacing: 0.02em;
 }
 
