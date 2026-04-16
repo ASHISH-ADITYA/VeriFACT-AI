@@ -241,24 +241,82 @@ class ClaimDecomposer:
 
     @staticmethod
     def _should_skip(sentence: str) -> bool:
-        lower = sentence.lower()
-        if sentence.endswith("?"):
+        """Aggressively filter non-verifiable sentences.
+
+        Only keep sentences that contain concrete, checkable facts.
+        Skip opinions, explanations, meta-text, common sense, and filler.
+        """
+        lower = sentence.lower().strip()
+        words = lower.split()
+
+        # Too short or too long
+        if len(words) < 5 or len(words) > 60:
             return True
-        if len(sentence.split()) < 5:
+
+        # Questions
+        if sentence.rstrip().endswith("?"):
             return True
+
+        # Hedged language
         if any(hw in lower for hw in _HEDGE_WORDS):
             return True
-        # Skip meta-commentary, instructions, and non-factual text
+
+        # Meta-commentary, instructions, transitions, filler
         skip_starts = [
-            "here are", "here is", "if you", "let me", "i hope",
-            "are you", "do you", "would you", "feel free",
-            "note:", "tip:", "warning:", "important:",
-            "in summary", "to summarize", "in conclusion",
+            "here are", "here is", "here's", "if you", "let me", "i hope",
+            "are you", "do you", "would you", "feel free", "please",
+            "note:", "tip:", "warning:", "important:", "remember",
+            "in summary", "to summarize", "in conclusion", "overall",
+            "for example", "for instance", "in other words", "that is",
+            "this means", "this is because", "this is why", "this is how",
+            "as a result", "as mentioned", "as noted", "as stated",
+            "it is worth", "it's worth", "it should be noted",
+            "the reason", "one reason", "another reason",
+            "first,", "second,", "third,", "finally,", "additionally,",
+            "furthermore,", "moreover,", "however,", "therefore,",
+            "in fact,", "indeed,", "specifically,", "essentially,",
+            "basically,", "simply put", "put simply",
         ]
         if any(lower.startswith(s) for s in skip_starts):
             return True
-        # Skip numbered list headers without factual content
-        return bool(re.match(r"^\d+\.\s+\w+$", sentence.strip()))
+
+        # Numbered/bulleted list headers
+        if re.match(r"^\d+[\.\)]\s*\w+(\s+\w+)?$", sentence.strip()):
+            return True
+
+        # Subjective/opinion indicators
+        opinion_words = [
+            "best", "worst", "amazing", "terrible", "beautiful", "ugly",
+            "should", "must", "need to", "have to", "ought to",
+            "i think", "i believe", "in my opinion", "personally",
+            "interesting", "fascinating", "remarkable", "significant",
+            "it's important", "it is important", "crucial", "essential",
+            "obviously", "clearly", "certainly", "definitely",
+        ]
+        if any(ow in lower for ow in opinion_words):
+            return True
+
+        # Common sense / tautologies (not worth verifying)
+        trivial = [
+            "this is a", "this was a", "it is a", "it was a",
+            "there are many", "there are several", "there are various",
+            "people often", "many people", "some people",
+        ]
+        if any(lower.startswith(t) for t in trivial):
+            return True
+
+        # Must contain at least one concrete signal to be verifiable:
+        # numbers, proper nouns (capitalized words), dates, measurements
+        has_number = bool(re.search(r"\d", sentence))
+        has_proper_noun = bool(re.search(r"[A-Z][a-z]{2,}", sentence[1:]))  # skip first char
+        has_factual_verb = any(v in lower for v in [
+            " is ", " was ", " are ", " were ", " has ", " had ",
+            " located ", " founded ", " invented ", " discovered ",
+            " born ", " died ", " built ", " created ", " published ",
+            " won ", " lost ", " defeated ", " signed ", " established ",
+        ])
+
+        return not (has_number or has_proper_noun or has_factual_verb)
 
     @staticmethod
     def _locate_span(original: str, sentence: str) -> tuple[int, int]:

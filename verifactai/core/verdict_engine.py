@@ -282,32 +282,31 @@ class VerdictEngine:
     def _apply_verdict_logic(
         self, claim: Claim, evidence_list: list[Evidence], nli_results: list[NLIResult]
     ) -> Verdict:
-        """Apply specificity gate, soft contradiction, and confidence logic to NLI results.
+        """Apply verdict logic with strong prior toward SUPPORTED.
+
+        Key principle: most chatbot responses are factually correct.
+        Only flag CONTRADICTED when evidence is STRONG and RELEVANT.
+        Default to SUPPORTED (not UNVERIFIABLE) when evidence is weak.
 
         Extracted from judge() so both judge() and batch_judge() share the same logic.
         """
-        # Contradiction-aware evidence mining
-        best_contra_nli = max(nli_results, key=lambda r: r.contradiction)
-
-        # Best evidence similarity across all retrieved passages
+        # ── Gather NLI signals ──
+        max_con = max(r.contradiction for r in nli_results)
+        max_raw_ent = max(r.entailment for r in nli_results)
+        best_contra = max(nli_results, key=lambda r: r.contradiction)
         max_similarity = max(r.evidence.similarity for r in nli_results)
 
-        # Aggregate with specificity gate
-        max_con = max(r.contradiction for r in nli_results)
-        best_contra = max(nli_results, key=lambda r: r.contradiction)
-
-        similarity_gate = 0.45
-
+        # Specificity-gated support: high entailment + relevant evidence
+        similarity_gate = 0.40
         specific_support_scores = []
         for r in nli_results:
             sim = r.evidence.similarity
-            if sim >= similarity_gate and r.entailment > 0.5:
+            if sim >= similarity_gate and r.entailment > 0.4:
                 specific_support_scores.append(r.entailment * sim)
             else:
                 specific_support_scores.append(0.0)
 
         max_specific_ent = max(specific_support_scores) if specific_support_scores else 0.0
-        max_raw_ent = max(r.entailment for r in nli_results)
 
         best_support_idx = (
             max(range(len(specific_support_scores)), key=lambda i: specific_support_scores[i])
@@ -316,43 +315,49 @@ class VerdictEngine:
         )
         best_support = nli_results[best_support_idx]
 
-        # Verdict label — evidence quality matters
         nc = self.config.nli
 
-        # Hard contradiction: strong NLI signal + relevant evidence
-        hard_contra = max_con > nc.contradiction_threshold and max_con > max_raw_ent
-
-        # Soft contradiction: moderate NLI signal BUT evidence must be relevant
-        # Without this similarity check, irrelevant evidence causes false contradictions
-        soft_contra = (
-            max_con > 0.50
-            and max_con > max_specific_ent
-            and best_contra.evidence.similarity > similarity_gate
+        # ── CONTRADICTED: only with STRONG + RELEVANT evidence ──
+        # Hard path: very high NLI contradiction + beats entailment + relevant evidence
+        hard_contra = (
+            max_con > nc.contradiction_threshold
+            and max_con > max_raw_ent
+            and best_contra.evidence.similarity > 0.45
         )
 
-        # Contradiction fallback: strong contradiction on high-quality evidence only
-        has_real_contradiction_evidence = (
-            best_contra_nli.contradiction > 0.60
-            and best_contra_nli.evidence.similarity > 0.50
+        # Soft path: moderate contradiction but evidence must be highly relevant
+        soft_contra = (
+            max_con > 0.65
+            and max_con > max_specific_ent + 0.15  # must beat support by clear margin
+            and best_contra.evidence.similarity > 0.50
         )
 
         is_contradicted = hard_contra or soft_contra
 
+        # ── SUPPORTED: generous — most facts are correct ──
+        # Strong support: specificity-gated entailment passes threshold
+        strong_support = max_specific_ent > nc.entailment_threshold
+
+        # Moderate support: raw entailment is decent with some relevant evidence
+        moderate_support = max_raw_ent > 0.40 and max_similarity > 0.35
+
+        # Weak support: evidence exists and doesn't contradict
+        # This is the key change — when evidence is ambiguous, lean SUPPORTED
+        weak_support = max_similarity > 0.30 and max_con < 0.50
+
+        # ── Decision order: CONTRADICTED → SUPPORTED → UNVERIFIABLE ──
         if is_contradicted:
             label = "CONTRADICTED"
             best_ev = best_contra.evidence
-        elif max_specific_ent > nc.entailment_threshold:
+        elif strong_support or moderate_support:
             label = "SUPPORTED"
             best_ev = best_support.evidence
-        elif max_raw_ent > 0.50 and max_similarity > similarity_gate:
-            # Relaxed support: evidence is relevant and entailing, even if not
-            # passing the strict specificity gate product threshold
+        elif weak_support:
+            # Default: evidence exists, no contradiction → trust the chatbot
             label = "SUPPORTED"
             best_ev = best_support.evidence
-        elif has_real_contradiction_evidence:
-            label = "CONTRADICTED"
-            best_ev = best_contra_nli.evidence
         else:
+            # Only truly unverifiable: no relevant evidence at all
             label = "UNVERIFIABLE"
             best_ev = best_support.evidence
 
