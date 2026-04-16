@@ -1,9 +1,12 @@
 """
 Evidence Retriever — Stage 2 of the VeriFactAI pipeline.
 
-Dense retrieval over a pre-built FAISS index of trusted knowledge sources
-(Wikipedia, PubMed). Returns top-k evidence passages per claim with metadata.
+Hybrid retrieval over:
+1. Pre-built FAISS index (local Wikipedia + FEVER chunks)
+2. Live Wikipedia API search (6.8M articles, fallback when local evidence is weak)
+3. BM25 sparse keyword matching
 
+Returns top-k evidence passages per claim with metadata.
 Supports both single-claim and batch retrieval for throughput.
 """
 
@@ -193,6 +196,20 @@ class EvidenceRetriever:
                     all_candidates.append(ev)
 
         reranked = self._rerank(claim_text, all_candidates, k)
+
+        # Fallback: if local evidence is weak, query live Wikipedia API
+        # This gives access to ALL 6.8M English Wikipedia articles
+        max_sim = max((ev.similarity for ev in reranked), default=0)
+        if max_sim < 0.40 and len(reranked) < k:
+            try:
+                wiki_results = self._wiki_api_search(claim_text, max_results=3)
+                if wiki_results:
+                    logger.info(f"Wiki API fallback: found {len(wiki_results)} live results")
+                    reranked.extend(wiki_results)
+                    reranked = reranked[:k]  # cap at top_k
+            except Exception:
+                pass  # fail silently — local results are still available
+
         return reranked
 
     @timed
@@ -315,6 +332,18 @@ class EvidenceRetriever:
                 )
                 for ev, score in scored_cands[:k]
             ]
+            # Wiki API fallback for weak local evidence
+            max_sim = max((ev.similarity for ev in reranked), default=0)
+            if max_sim < 0.40 and len(reranked) < k:
+                try:
+                    wiki_ev = self._wiki_api_search(claims[i], max_results=2)
+                    if wiki_ev:
+                        logger.info(f"Wiki API fallback for claim {i}: {len(wiki_ev)} results")
+                        reranked.extend(wiki_ev)
+                        reranked = reranked[:k]
+                except Exception:
+                    pass
+
             results.append(reranked)
 
         return results
@@ -528,3 +557,69 @@ class EvidenceRetriever:
                     entries.append(json.loads(line))
         logger.info(f"Loaded {len(entries):,} metadata entries")
         return entries
+
+    # ------------------------------------------------------------------
+    # Live Wikipedia API search (6.8M articles, fallback for weak local evidence)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _wiki_api_search(query: str, max_results: int = 3) -> list[Evidence]:
+        """Search Wikipedia API for evidence when local FAISS results are weak.
+
+        This gives access to ALL 6.8M English Wikipedia articles without storing
+        anything locally. Used as fallback when local evidence similarity is low.
+        """
+        import urllib.error
+        import urllib.request
+
+        # Step 1: Search for relevant article titles
+        search_url = (
+            f"https://en.wikipedia.org/w/api.php?action=query&list=search"
+            f"&srsearch={urllib.parse.quote(query)}&srlimit={max_results}"
+            f"&format=json&utf8=1"
+        )
+        try:
+            req = urllib.request.Request(search_url, headers={"User-Agent": "VeriFACT-AI/1.0"})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+            return []
+
+        results: list[Evidence] = []
+        for item in data.get("query", {}).get("search", []):
+            title = item.get("title", "")
+            # Strip HTML from snippet
+            snippet = re.sub(r"<[^>]+>", "", item.get("snippet", ""))
+            if not snippet or len(snippet) < 20:
+                continue
+
+            # Step 2: Get first paragraph of the article for better evidence
+            extract_url = (
+                f"https://en.wikipedia.org/w/api.php?action=query&titles={urllib.parse.quote(title)}"
+                f"&prop=extracts&exintro=1&explaintext=1&exsentences=5&format=json&utf8=1"
+            )
+            try:
+                req2 = urllib.request.Request(extract_url, headers={"User-Agent": "VeriFACT-AI/1.0"})
+                with urllib.request.urlopen(req2, timeout=5) as resp2:
+                    extract_data = json.loads(resp2.read().decode("utf-8"))
+                pages = extract_data.get("query", {}).get("pages", {})
+                extract_text = ""
+                for page in pages.values():
+                    extract_text = page.get("extract", "")
+                    break
+                if extract_text and len(extract_text) > 30:
+                    text = extract_text[:500]  # Cap at 500 chars
+                else:
+                    text = snippet
+            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+                text = snippet
+
+            results.append(Evidence(
+                text=text,
+                source="wikipedia_live",
+                title=title,
+                url=f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}",
+                similarity=0.60,  # Fixed score — we trust Wikipedia content
+                chunk_id=-1,  # Not from local index
+            ))
+
+        return results
