@@ -52,6 +52,10 @@
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\footrulewidth}{0.2pt}
 
+% ── Fix header height ─────────────────────────────────
+\setlength{\headheight}{14.5pt}
+\addtolength{\topmargin}{-2.5pt}
+
 % ── Line Spacing ──────────────────────────────────────
 \onehalfspacing
 
@@ -330,7 +334,7 @@ SAFE (Google) & 2024 & Search-augmented factual evaluation & No & No & No \\
 \end{tabularx}
 \end{table}
 
-Each of the 14 research papers reviewed (stored in the project's \texttt{/architecture/} directory) directly influenced at least one pipeline stage, as detailed in Table~\ref{tab:research_mapping} in Chapter~2.
+Each of the 14 research papers reviewed (stored in the project's \texttt{/architecture/} directory) directly influenced at least one pipeline stage, as detailed in Chapter~2.
 
 % ════════════════════════════════════════════════════════
 % CHAPTER 2 — SYSTEM ARCHITECTURE & METHODOLOGY
@@ -403,7 +407,7 @@ Country--continent & 32 & Brazil $\rightarrow$ South America \\
 Person--achievement & 29 & Einstein $\rightarrow$ physics \\
 Historical event dates & 7 & WWII: 1939--1945 \\
 Person birth/death dates & 9 & Shakespeare: 1564--1616 \\
-Science numerical facts & 5 & Water boiling: $100\degree$C $\pm5$ \\
+Science numerical facts & 5 & Water boiling: $100^{\circ}$C $\pm5$ \\
 Science true/false & 8 & ``Sun revolves around Earth'' $\rightarrow$ False \\
 \midrule
 \textbf{Total} & \textbf{205} & \\
