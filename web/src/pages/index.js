@@ -3,13 +3,23 @@ import Head from "next/head";
 
 const API = "https://adiashish-verifact-ai.hf.space";
 
+// SVG icon drawings inspired by each chatbot's visual style
+const CHATBOT_ICONS = {
+  chatgpt: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`,
+  gemini: `<svg viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 14.5 8 18 12C14.5 16 12 22 12 22C12 22 9.5 16 6 12C9.5 8 12 2 12 2Z" fill="currentColor" opacity="0.7"/><path d="M12 6C12 6 13.5 9 16 12C13.5 15 12 18 12 18C12 18 10.5 15 8 12C10.5 9 12 6 12 6Z" fill="currentColor"/></svg>`,
+  claude: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="10" r="6" opacity="0.7"/><path d="M8 14c0 3 1.8 5 4 5s4-2 4-5" opacity="0.5"/><circle cx="10" cy="9" r="1" fill="white"/><circle cx="14" cy="9" r="1" fill="white"/></svg>`,
+  grok: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" opacity="0.7"/></svg>`,
+  copilot: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L3 7v6c0 5 4 9 9 11 5-2 9-6 9-11V7l-9-5z" opacity="0.7"/><path d="M12 6l-5 3v4c0 3 2.2 5.5 5 6.5 2.8-1 5-3.5 5-6.5V9l-5-3z" fill="white" opacity="0.4"/></svg>`,
+  perplexity: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/><circle cx="11" cy="11" r="3" fill="currentColor" opacity="0.3"/></svg>`,
+};
+
 const CHATBOTS = [
-  { name: "ChatGPT", url: "https://chatgpt.com", emoji: "\u{1F916}", c: "#10a37f" },
-  { name: "Gemini", url: "https://gemini.google.com", emoji: "\u2728", c: "#4285f4" },
-  { name: "Claude", url: "https://claude.ai", emoji: "\u{1F9E0}", c: "#d97706" },
-  { name: "Grok", url: "https://grok.x.ai", emoji: "\u26A1", c: "#1da1f2" },
-  { name: "Copilot", url: "https://copilot.microsoft.com", emoji: "\u{1F48E}", c: "#7c3aed" },
-  { name: "Perplexity", url: "https://perplexity.ai", emoji: "\u{1F50D}", c: "#20b2aa" },
+  { name: "ChatGPT", url: "https://chatgpt.com", icon: "chatgpt", c: "#10a37f" },
+  { name: "Gemini", url: "https://gemini.google.com", icon: "gemini", c: "#4285f4" },
+  { name: "Claude", url: "https://claude.ai", icon: "claude", c: "#d97706" },
+  { name: "Grok", url: "https://grok.x.ai", icon: "grok", c: "#1da1f2" },
+  { name: "Copilot", url: "https://copilot.microsoft.com", icon: "copilot", c: "#7c3aed" },
+  { name: "Perplexity", url: "https://perplexity.ai", icon: "perplexity", c: "#20b2aa" },
 ];
 
 const EXAMPLES = [
@@ -105,19 +115,11 @@ export default function Home() {
 
         {/* Header */}
         <header style={{ textAlign: "center", marginBottom: 24 }}>
-          <div style={{
-            display: "inline-flex", width: 64, height: 64, borderRadius: 18,
-            background: "linear-gradient(145deg, rgba(30,120,180,0.7), rgba(0,180,200,0.6), rgba(40,100,200,0.75))",
-            border: "2.5px solid rgba(255,255,255,0.7)",
-            backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-            alignItems: "center", justifyContent: "center",
-            fontSize: "1.6rem", fontWeight: 900, color: "#fff",
-            fontFamily: "'Inter', -apple-system, sans-serif",
-            letterSpacing: "-0.04em",
-            textShadow: "0 2px 8px rgba(0,80,150,0.4)",
+          <img src="/logo.png" alt="VeriFACT AI" style={{
+            width: 72, height: 72, objectFit: "contain",
             marginBottom: 10, animation: "float 3s ease-in-out infinite",
-            boxShadow: "0 8px 32px rgba(0,120,180,0.25), inset 0 2px 0 rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.08), inset 3px 0 8px rgba(100,200,255,0.15), inset -3px 0 8px rgba(0,150,200,0.1)",
-          }}>VF</div>
+            filter: "drop-shadow(0 6px 20px rgba(0,100,180,0.3))",
+          }} />
           <h1 style={{
             fontSize: "2.4rem", fontWeight: 800, letterSpacing: "-0.03em",
             background: "linear-gradient(135deg, #00897b, #00bcd4, #4caf50, #ffc107)",
@@ -128,22 +130,22 @@ export default function Home() {
           </p>
         </header>
 
-        {/* Chatbot Icons */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        {/* Chatbot Icons — round liquid glass buttons with SVG logos */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           {CHATBOTS.map(b => (
-            <a key={b.name} href={b.url} target="_blank" rel="noreferrer" style={{
-              display: "flex", alignItems: "center", gap: 5, padding: "7px 14px",
-              borderRadius: 12, textDecoration: "none", fontSize: "0.8rem", fontWeight: 600,
-              color: "#2e5a3e",
-              background: "rgba(255,255,255,0.55)",
-              border: "1px solid rgba(0,150,136,0.15)",
-              backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
-              transition: "all 0.2s ease",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            <a key={b.name} href={b.url} target="_blank" rel="noreferrer" title={b.name} style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 50, height: 50, borderRadius: "50%",
+              textDecoration: "none", color: b.c,
+              background: "rgba(255,255,255,0.65)",
+              border: "2px solid rgba(255,255,255,0.8)",
+              backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+              transition: "all 0.25s ease",
+              boxShadow: `0 4px 14px rgba(0,0,0,0.06), inset 0 2px 0 rgba(255,255,255,0.7), inset 0 -1px 3px rgba(0,0,0,0.04)`,
             }}
-            onMouseOver={e => { e.currentTarget.style.background = "rgba(255,255,255,0.8)"; e.currentTarget.style.borderColor = b.c; e.currentTarget.style.boxShadow = `0 4px 16px ${b.c}22`; }}
-            onMouseOut={e => { e.currentTarget.style.background = "rgba(255,255,255,0.55)"; e.currentTarget.style.borderColor = "rgba(0,150,136,0.15)"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)"; }}
-            ><span style={{ fontSize: "1.1rem" }}>{b.emoji}</span>{b.name}</a>
+            onMouseOver={e => { e.currentTarget.style.background = "rgba(255,255,255,0.9)"; e.currentTarget.style.borderColor = b.c; e.currentTarget.style.boxShadow = `0 6px 20px ${b.c}30, inset 0 2px 0 rgba(255,255,255,0.8)`; e.currentTarget.style.transform = "scale(1.1)"; }}
+            onMouseOut={e => { e.currentTarget.style.background = "rgba(255,255,255,0.65)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.8)"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(0,0,0,0.06), inset 0 2px 0 rgba(255,255,255,0.7), inset 0 -1px 3px rgba(0,0,0,0.04)"; e.currentTarget.style.transform = "scale(1)"; }}
+            ><span style={{ width: 24, height: 24 }} dangerouslySetInnerHTML={{ __html: CHATBOT_ICONS[b.icon] }} /></a>
           ))}
         </div>
 
