@@ -8,52 +8,101 @@
   position: fixed;
   right: 20px;
   bottom: 28px;
-  width: 54px;
-  height: 54px;
-  border-radius: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.7);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  /* Crystal clear glass sphere */
+  border: 2.5px solid rgba(255, 255, 255, 0.85);
   box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.18),
-    0 2px 6px rgba(0, 0, 0, 0.1),
-    inset 0 2px 0 rgba(255, 255, 255, 0.6);
+    /* Outer depth shadow */
+    0 8px 30px rgba(0, 0, 0, 0.15),
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    /* Top highlight — glass refraction */
+    inset 0 3px 1px rgba(255, 255, 255, 0.9),
+    /* Bottom subtle shadow */
+    inset 0 -2px 4px rgba(0, 0, 0, 0.06),
+    /* Side prismatic glow */
+    inset 3px 0 8px rgba(180, 200, 255, 0.15),
+    inset -3px 0 8px rgba(255, 180, 220, 0.1);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 2147483646;
   cursor: pointer;
-  backdrop-filter: blur(30px) saturate(180%);
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
   font-size: 11px;
   font-weight: 700;
   color: #fff;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   -webkit-user-select: none;
   user-select: none;
 }
-.verifact-beacon:hover { transform: scale(1.08); }
-.verifact-beacon:active { transform: scale(0.95); }
+.verifact-beacon:hover {
+  transform: scale(1.1);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.2), inset 0 3px 1px rgba(255,255,255,0.95), inset 0 -2px 4px rgba(0,0,0,0.06);
+}
+.verifact-beacon:active { transform: scale(0.93); }
 
-.verifact-beacon-label { font-size: 15px; font-weight: 800; line-height: 1; }
-.verifact-beacon-status { font-size: 7px; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2px; }
+.verifact-beacon-label { font-size: 16px; font-weight: 800; line-height: 1; }
+.verifact-beacon-status { font-size: 7px; font-weight: 700; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2px; }
 
-.verifact-beacon.idle       { background: linear-gradient(145deg, #5b9cf5, #3b7ddb); }
-.verifact-beacon.analyzing  { background: linear-gradient(145deg, #a78bfa, #7c3aed); animation: vfPulse 1.5s infinite; }
-.verifact-beacon.safe       { background: linear-gradient(145deg, #4ade80, #22c55e); }
-.verifact-beacon.minor      { background: linear-gradient(145deg, #c084fc, #9333ea); }
-.verifact-beacon.moderate   { background: linear-gradient(145deg, #fb923c, #ea580c); }
-.verifact-beacon.hallucinated { background: linear-gradient(145deg, #f87171, #dc2626); animation: vfPulseRed 1s infinite; }
-.verifact-beacon.error      { background: linear-gradient(145deg, #9ca3af, #6b7280); }
+/* States — glass tinted sphere */
+.verifact-beacon.idle {
+  background: linear-gradient(155deg, rgba(120,170,255,0.5) 0%, rgba(80,140,240,0.65) 50%, rgba(60,120,220,0.7) 100%);
+}
+.verifact-beacon.analyzing {
+  background: linear-gradient(155deg, rgba(180,140,255,0.5) 0%, rgba(140,100,240,0.65) 50%, rgba(120,60,220,0.7) 100%);
+  animation: vfPulse 1.5s infinite;
+}
+.verifact-beacon.safe {
+  background: linear-gradient(155deg, rgba(100,220,160,0.5) 0%, rgba(60,200,130,0.65) 50%, rgba(34,197,94,0.7) 100%);
+}
+.verifact-beacon.minor {
+  background: linear-gradient(155deg, rgba(200,140,255,0.5) 0%, rgba(160,100,240,0.65) 50%, rgba(147,51,234,0.7) 100%);
+}
+.verifact-beacon.moderate {
+  background: linear-gradient(155deg, rgba(255,180,100,0.5) 0%, rgba(250,150,60,0.65) 50%, rgba(234,88,12,0.7) 100%);
+}
+.verifact-beacon.hallucinated {
+  background: linear-gradient(155deg, rgba(255,130,130,0.5) 0%, rgba(240,90,90,0.65) 50%, rgba(220,38,38,0.7) 100%);
+  animation: vfPulseRed 1s infinite;
+}
+.verifact-beacon.error {
+  background: linear-gradient(155deg, rgba(180,180,190,0.4) 0%, rgba(150,150,160,0.55) 50%, rgba(120,120,130,0.6) 100%);
+}
 
-@keyframes vfPulse { 0%{box-shadow:0 0 0 0 rgba(124,58,237,0.4)} 70%{box-shadow:0 0 0 12px rgba(124,58,237,0)} 100%{box-shadow:0 0 0 0 rgba(124,58,237,0)} }
-@keyframes vfPulseRed { 0%{box-shadow:0 0 0 0 rgba(220,38,38,0.4)} 70%{box-shadow:0 0 0 12px rgba(220,38,38,0)} 100%{box-shadow:0 0 0 0 rgba(220,38,38,0)} }
+@keyframes vfPulse { 0%{box-shadow:0 0 0 0 rgba(140,100,240,0.35)} 70%{box-shadow:0 0 0 14px rgba(140,100,240,0)} 100%{box-shadow:0 0 0 0 rgba(140,100,240,0)} }
+@keyframes vfPulseRed { 0%{box-shadow:0 0 0 0 rgba(220,38,38,0.35)} 70%{box-shadow:0 0 0 14px rgba(220,38,38,0)} 100%{box-shadow:0 0 0 0 rgba(220,38,38,0)} }
 
+/* Prismatic glass ring — rotating rainbow refraction */
 .verifact-beacon::before {
-  content: ''; position: absolute; inset: -3px; border-radius: 18px;
-  background: conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.25) 25%, transparent 50%, rgba(255,255,255,0.2) 75%, transparent 100%);
-  animation: vfGlow 3s linear infinite; pointer-events: none;
+  content: ''; position: absolute; inset: -4px; border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(180,200,255,0.2) 0%,
+    rgba(200,160,255,0.25) 15%,
+    rgba(255,180,200,0.2) 30%,
+    transparent 45%,
+    rgba(100,220,220,0.2) 55%,
+    rgba(180,255,200,0.15) 70%,
+    rgba(180,200,255,0.2) 85%,
+    rgba(200,160,255,0.2) 100%
+  );
+  animation: vfGlow 4s linear infinite; pointer-events: none;
+}
+/* Inner glass highlight spot — top-left shine */
+.verifact-beacon::after {
+  content: ''; position: absolute;
+  top: 6px; left: 10px;
+  width: 16px; height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  filter: blur(3px);
+  pointer-events: none;
 }
 @keyframes vfGlow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
 
