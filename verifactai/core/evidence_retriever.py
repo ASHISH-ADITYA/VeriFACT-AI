@@ -633,12 +633,18 @@ class EvidenceRetriever:
                 best_paras = [p for _, p in scored[:2]]
                 best_text = " ".join(best_paras)[:800]
 
+            # Compute actual relevance: what fraction of query terms appear in the evidence?
+            evidence_words = {w.lower() for w in re.findall(r"[a-zA-Z]{3,}", best_text)}
+            term_overlap = len(query_terms & evidence_words) / max(len(query_terms), 1)
+            # Scale: 0.0 (no overlap) to 0.70 (perfect overlap)
+            computed_similarity = min(term_overlap * 0.85, 0.70)
+
             results.append(Evidence(
                 text=best_text,
                 source="wikipedia_live",
                 title=title,
                 url=f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}",
-                similarity=0.60,  # Fixed score — we trust Wikipedia content
+                similarity=round(computed_similarity, 3),
                 chunk_id=-1,  # Not from local index
             ))
 
