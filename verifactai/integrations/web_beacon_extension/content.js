@@ -477,7 +477,9 @@ function getInputElement() {
 
 async function optimizePrompt(text) {
   const store = await chrome.storage.local.get(["verifactApiUrl"]);
-  const base = (store.verifactApiUrl || "https://adiashish-verifact-ai.hf.space").replace("/analyze", "");
+  const rawUrl = store.verifactApiUrl || "https://adiashish-verifact-ai.hf.space/analyze/fast";
+  // Extract base URL by removing everything after the hostname
+  const base = rawUrl.replace(/\/analyze.*$/, "");
   try {
     const res = await fetch(base + "/optimize", {
       method: "POST",
