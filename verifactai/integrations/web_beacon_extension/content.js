@@ -173,7 +173,6 @@ async function callAPI(text) {
 
 function highlightNode(node, flags) {
   if (!node || !flags || node.dataset.vfDone === "1") return;
-  // Only highlight CONTRADICTED claims — no yellow for UNVERIFIABLE (reduces noise)
   const bad = flags.filter((f) => /(contrad)/i.test(f.verdict || ""));
   if (!bad.length) { node.dataset.vfDone = "1"; return; }
 
@@ -182,21 +181,48 @@ function highlightNode(node, flags) {
 
   for (const f of bad) {
     const claim = (f.claim || "").trim();
-    if (claim.length < 12) continue;
-    const probe = claim.slice(0, Math.min(50, claim.length)).toLowerCase();
-    for (const tn of tns) {
-      const idx = tn.nodeValue.toLowerCase().indexOf(probe);
-      if (idx === -1) continue;
-      const span = document.createElement("span");
-      span.className = "verifact-hl-red";
-      span.title = `${f.verdict} (${Math.round((f.confidence || 0) * 100)}%)`;
-      const full = tn.nodeValue, frag = document.createDocumentFragment();
-      if (idx > 0) frag.appendChild(document.createTextNode(full.slice(0, idx)));
-      span.textContent = full.slice(idx, idx + probe.length);
-      frag.appendChild(span);
-      if (idx + probe.length < full.length) frag.appendChild(document.createTextNode(full.slice(idx + probe.length)));
-      tn.parentNode.replaceChild(frag, tn);
-      break;
+    if (claim.length < 8) continue;
+
+    // Try multiple matching strategies (most specific → least specific)
+    const probes = [
+      claim.slice(0, Math.min(60, claim.length)).toLowerCase(),  // first 60 chars
+      claim.slice(0, Math.min(40, claim.length)).toLowerCase(),  // first 40 chars
+      claim.slice(0, Math.min(25, claim.length)).toLowerCase(),  // first 25 chars
+    ];
+
+    // Also extract key noun phrases (capitalized multi-word terms)
+    const keyPhrases = claim.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+/g) || [];
+    for (const kp of keyPhrases) {
+      if (kp.length > 6) probes.push(kp.toLowerCase());
+    }
+
+    let matched = false;
+    for (const probe of probes) {
+      if (matched) break;
+      if (probe.length < 6) continue;
+      for (const tn of tns) {
+        const idx = tn.nodeValue.toLowerCase().indexOf(probe);
+        if (idx === -1) continue;
+        const span = document.createElement("span");
+        span.className = "verifact-hl-red";
+        span.title = `CONTRADICTED (${Math.round((f.confidence || 0) * 100)}%) — ${f.claim.substring(0, 80)}`;
+        const full = tn.nodeValue, frag = document.createDocumentFragment();
+        // Highlight the entire sentence containing the match, not just the probe
+        let start = idx;
+        let end = idx + probe.length;
+        // Expand to sentence boundaries
+        while (start > 0 && full[start - 1] !== '.' && full[start - 1] !== '\n') start--;
+        while (end < full.length && full[end] !== '.' && full[end] !== '\n') end++;
+        if (full[end] === '.') end++; // include the period
+
+        if (start > 0) frag.appendChild(document.createTextNode(full.slice(0, start)));
+        span.textContent = full.slice(start, end);
+        frag.appendChild(span);
+        if (end < full.length) frag.appendChild(document.createTextNode(full.slice(end)));
+        tn.parentNode.replaceChild(frag, tn);
+        matched = true;
+        break;
+      }
     }
   }
   node.dataset.vfDone = "1";
