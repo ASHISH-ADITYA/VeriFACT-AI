@@ -173,6 +173,14 @@ HISTORICAL_EVENTS: list[tuple[str, int, int, str]] = [
     ("internet", 1960, 1995, "The internet was developed between the 1960s and 1990s"),
     ("roman empire fell", 395, 476, "The Western Roman Empire fell in 476 AD"),
     ("fall of rome", 395, 476, "The Western Roman Empire fell in 476 AD"),
+    ("berlin wall fell", 1989, 1989, "The Berlin Wall fell in 1989"),
+    ("berlin wall", 1961, 1989, "The Berlin Wall stood from 1961 to 1989"),
+    ("american civil war", 1861, 1865, "The American Civil War was from 1861 to 1865"),
+    ("civil war", 1861, 1865, "The American Civil War was from 1861 to 1865"),
+    ("printing press", 1440, 1455, "The printing press was invented around 1440-1455"),
+    ("great depression", 1929, 1939, "The Great Depression was from 1929 to 1939"),
+    ("indian independence", 1947, 1947, "India gained independence in 1947"),
+    ("french revolution started", 1789, 1789, "The French Revolution started in 1789"),
 ]
 
 # (person_keyword, birth_year_min, birth_year_max, death_year_min, death_year_max, desc)
@@ -208,6 +216,44 @@ SCIENCE_TRUTHS: dict[str, bool] = {
     "gold is a solid": True,
     "sound travels faster than light": False,
     "light travels faster than sound": True,
+    "the earth is flat": False,
+    "earth is flat": False,
+    "the world is flat": False,
+    "diamonds are made of iron": False,
+    "diamonds are made of carbon": True,
+    "isaac newton discovered penicillin": False,
+    "newton discovered penicillin": False,
+    "fleming discovered penicillin": True,
+    "alexander fleming discovered penicillin": True,
+    "marie curie was a famous painter": False,
+    "marie curie was italian": False,
+    "marie curie was polish": True,
+    "humans have 206 bones": True,
+    "the human body has 206 bones": True,
+    "napoleon bonaparte was the first president of the united states": False,
+    "napoleon was the first president of the united states": False,
+    "george washington was the first president of the united states": True,
+    "mahatma gandhi was the prime minister of china": False,
+    "gandhi was the prime minister of china": False,
+    "nikola tesla painted the mona lisa": False,
+    "tesla painted the mona lisa": False,
+    "leonardo da vinci painted the mona lisa": True,
+    "da vinci painted the mona lisa": True,
+    "mars is the closest planet to the sun": False,
+    "mercury is the closest planet to the sun": True,
+    "plants produce energy through fermentation": False,
+    "plants produce energy through photosynthesis": True,
+    "shakespeare wrote hamlet": True,
+    "william shakespeare wrote hamlet": True,
+    "oxygen is essential for human respiration": True,
+    "world war ii ended in 1945": True,
+    "world war 2 ended in 1945": True,
+    "the great wall of china is approximately 50 meters long": False,
+    "the great wall of china is 50 meters long": False,
+    "the population of china is 10 million": False,
+    "albert einstein invented the telephone": False,
+    "einstein invented the telephone": False,
+    "alexander graham bell invented the telephone": True,
 }
 
 # ── Famous person facts ──────────────────────────────────────────
@@ -342,19 +388,26 @@ def check_rules(claim_text: str) -> RuleViolation | None:
                     )
 
     # ── Rule 4: Person did wrong thing ────────────────────────
+    # Only fire if (a) claim mentions an achievement that is NOT in this person's
+    # known_for list, AND (b) that achievement IS in some other person's list.
+    # This prevents flagging "Shakespeare wrote Hamlet" as wrong (Hamlet IS in
+    # Shakespeare's known_for) just because Hamlet appears in lower.
     for person, known_for in PERSON_KNOWN_FOR.items():
         if person in lower:
-            # Check if claim attributes something known for someone else
             for other_person, other_known in PERSON_KNOWN_FOR.items():
                 if other_person == person:
                     continue
                 for achievement in other_known:
+                    if achievement in known_for:
+                        # Achievement is shared / belongs to this person too — skip
+                        continue
                     if achievement in lower and (
                         "invented" in lower
                         or "discovered" in lower
                         or "created" in lower
                         or "wrote" in lower
                         or "built" in lower
+                        or "painted" in lower
                     ):
                         return RuleViolation(
                             rule_name="person_achievement",

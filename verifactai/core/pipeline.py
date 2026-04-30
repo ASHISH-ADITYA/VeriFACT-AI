@@ -86,31 +86,61 @@ class VeriFactPipeline:
 
         start = time.perf_counter()
 
-        # Stage 1 — Claim Decomposition
-        claims = self.decomposer.decompose(text)
-        logger.info(f"Stage 1 complete: {len(claims)} claims extracted")
-
-        # Stage 2a — Fast rule-check pass (instant, catches obvious contradictions)
         from core.evidence_retriever import Evidence
         from core.fact_rules import check_rules
+        from core.claim_decomposer import Claim
 
-        rule_resolved = set()
-        for claim in claims:
-            rule = check_rules(claim.text)
-            if rule:
-                logger.info(f"Rule fast-pass [{rule.rule_name}]: {claim.text[:50]} → CONTRADICTED")
-                claim.evidence = [Evidence(
-                    text=rule.correct_fact, source="factual_rule",
-                    title=f"Rule: {rule.rule_name}", url="", similarity=1.0, chunk_id=-1,
-                )]
-                claim.verdict = "CONTRADICTED"
-                claim.confidence = 0.95
-                claim.uncertainty = 0.05
-                claim.stability = 0.95
-                claim.best_evidence = claim.evidence[0]
-                claim.nli_scores = {"rule_override": True, "rule_name": rule.rule_name, "rule_reason": rule.reason}
-                claim.all_nli_results = []
-                rule_resolved.add(claim.id)
+        # Stage 0 — Whole-text rule pre-check: if the raw input matches a rule,
+        # synthesise a single claim immediately (avoids decomposer dropping short
+        # sentences like "The Earth is flat.").
+        whole_text_rule = check_rules(text)
+        if whole_text_rule is not None:
+            synth = Claim(
+                id="c-rule-0",
+                text=text.strip(),
+                source_sentence=text.strip(),
+                claim_type="entity_fact",
+                char_start=0,
+                char_end=len(text),
+            )
+            synth.evidence = [Evidence(
+                text=whole_text_rule.correct_fact, source="factual_rule",
+                title=f"Rule: {whole_text_rule.rule_name}", url="", similarity=1.0, chunk_id=-1,
+            )]
+            synth.verdict = "CONTRADICTED"
+            synth.confidence = 0.95
+            synth.uncertainty = 0.05
+            synth.stability = 0.95
+            synth.best_evidence = synth.evidence[0]
+            synth.nli_scores = {"rule_override": True, "rule_name": whole_text_rule.rule_name,
+                                "rule_reason": whole_text_rule.reason}
+            synth.all_nli_results = []
+            claims = [synth]
+            rule_resolved = {synth.id}
+            logger.info(f"Stage 0 whole-text rule [{whole_text_rule.rule_name}]: forced CONTRADICTED")
+        else:
+            # Stage 1 — Claim Decomposition (normal path)
+            claims = self.decomposer.decompose(text)
+            logger.info(f"Stage 1 complete: {len(claims)} claims extracted")
+
+            # Stage 2a — Per-claim rule check
+            rule_resolved = set()
+            for claim in claims:
+                rule = check_rules(claim.text)
+                if rule:
+                    logger.info(f"Rule fast-pass [{rule.rule_name}]: {claim.text[:50]} → CONTRADICTED")
+                    claim.evidence = [Evidence(
+                        text=rule.correct_fact, source="factual_rule",
+                        title=f"Rule: {rule.rule_name}", url="", similarity=1.0, chunk_id=-1,
+                    )]
+                    claim.verdict = "CONTRADICTED"
+                    claim.confidence = 0.95
+                    claim.uncertainty = 0.05
+                    claim.stability = 0.95
+                    claim.best_evidence = claim.evidence[0]
+                    claim.nli_scores = {"rule_override": True, "rule_name": rule.rule_name, "rule_reason": rule.reason}
+                    claim.all_nli_results = []
+                    rule_resolved.add(claim.id)
 
         # Stage 2b — Evidence Retrieval (only for unresolved claims)
         unresolved = [c for c in claims if c.id not in rule_resolved]
